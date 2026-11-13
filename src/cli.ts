@@ -23,6 +23,8 @@ import { createRuntimeWorkflowRunner } from "./workflows/runtime-runner.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
 import { parseAgentRuntimeResult } from "./runtime/result-contract.js";
 import type { RuntimeMode } from "./runtime/types.js";
+import { loadSchedules } from "./schedules/loader.js";
+import { tickSchedules } from "./schedules/tick.js";
 
 function valueAfter(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -48,6 +50,8 @@ function usage(): void {
   team bootstrap status
   team knowledge check
   team knowledge compile
+  team schedule list
+  team schedule tick [--at <ISO-8601>]
   team task create --owner <agent-id> --objective <text> --why <text> [--write <path/**>]... [--forbid <action>]...
   team task show <task-id>
   team task transition <task-id> <status>
@@ -195,6 +199,24 @@ async function knowledge(root: string, args: string[]): Promise<void> {
     return;
   }
   throw new Error("Usage: team knowledge <check|compile>");
+}
+
+async function schedule(root: string, args: string[]): Promise<void> {
+  const schedules = await loadSchedules(root);
+  if (args[0] === "list") {
+    const firings = await withTaskStore(root, (store) => store.listScheduleFirings());
+    console.log(JSON.stringify({ schedules, firings }, null, 2));
+    return;
+  }
+  if (args[0] === "tick") {
+    const at = valueAfter(args, "--at");
+    const now = at ? new Date(at) : new Date();
+    if (Number.isNaN(now.getTime())) throw new Error("--at must be a valid ISO-8601 timestamp");
+    const results = await withTaskStore(root, (store) => tickSchedules(store, schedules, now));
+    console.log(JSON.stringify({ checked_at: now.toISOString(), results }, null, 2));
+    return;
+  }
+  throw new Error("Usage: team schedule <list|tick>");
 }
 
 async function withTaskStore<T>(root: string, operation: (store: TaskStore) => T | Promise<T>): Promise<T> {
@@ -384,6 +406,7 @@ async function main(): Promise<void> {
   else if (command === "ask") await ask(root, args);
   else if (command === "bootstrap") await bootstrapStatus(root, args);
   else if (command === "knowledge") await knowledge(root, args);
+  else if (command === "schedule") await schedule(root, args);
   else if (command === "task") await task(root, args);
   else if (command === "handoff") await handoff(root, args);
   else if (command === "workflow") await workflow(root, args);

@@ -41,6 +41,8 @@ Workflow는 `workflows/*.yaml`에 정의합니다. loader는 dependency와 cycle
 
 Workflow 실행 상태는 Task와 함께 SQLite에 저장됩니다. 실패·중단 뒤 `team workflow list`로 run을 찾고 `team workflow resume`으로 이어가면 완료된 step은 다시 실행하지 않습니다. 시작 후 YAML 정의가 바뀐 run은 digest 검증에 실패하므로 새 정의에 묵시적으로 이어 붙지 않습니다.
 
+`team schedule tick`은 timezone-aware weekly/monthly slot을 확인해 idempotent한 `draft` Task를 만듭니다. 외부 cron/systemd timer가 tick만 호출하고, 실제 Runtime workflow 실행은 사람이 Task를 검토해 `ready`로 전환한 뒤 시작합니다.
+
 중요 행동은 `team approval request`로 Human Inbox에 들어갑니다. 요청은 승인 대상 artifact의 SHA-256과 결합되며, 파일이 변경되면 기존 승인을 사용할 수 없습니다.
 
 Workflow에는 `type: approval` step을 둘 수 있습니다. 해당 지점에서 run과 Task가 함께 멈추고, 승인 결정 후 완료되거나 같은 run의 다음 step부터 재개됩니다. `feature-delivery`는 release checklist에 결합된 마지막 승인 step을 포함합니다.
