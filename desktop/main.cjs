@@ -112,6 +112,12 @@ function registerIpc() {
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
     return (await service()).setDesktopRuntime(activeProjectRoot, appRoot, runtime);
   });
+
+  ipcMain.handle("workflows:startIdeaValidation", async (event, input) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    return (await service()).startDesktopIdeaValidation(activeProjectRoot, appRoot, input);
+  });
 }
 
 function createWindow() {

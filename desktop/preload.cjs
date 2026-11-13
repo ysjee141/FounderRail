@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld("founderDesk", {
   refreshProject: () => ipcRenderer.invoke("projects:refresh"),
   initializeProject: (runtime) => ipcRenderer.invoke("projects:initialize", runtime),
   setRuntime: (runtime) => ipcRenderer.invoke("projects:setRuntime", runtime),
+  startIdeaValidation: (input) => ipcRenderer.invoke("workflows:startIdeaValidation", input),
 });

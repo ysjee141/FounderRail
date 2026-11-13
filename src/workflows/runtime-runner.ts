@@ -33,9 +33,10 @@ export async function createRuntimeWorkflowRunner(
   root: string,
   timeoutMs = 300_000,
   injectedExecutor?: RuntimeAgentExecutor,
+  definitionsRoot = root,
 ): Promise<AgentStepRunner> {
   const adapter = injectedExecutor ? undefined : getRuntimeAdapter((await loadConfig(root)).runtime);
-  const registry = await AgentRegistry.load(root);
+  const registry = await AgentRegistry.load(definitionsRoot);
   const events = new JsonlEventStore(path.join(stateDirectory(root), "events"));
 
   return async ({ workflow, step, task, priorHandoffs }) => {
@@ -70,7 +71,7 @@ export async function createRuntimeWorkflowRunner(
       writablePaths: step.execution === "engineering-implement" ? task.scope.writable_paths : [],
       forbiddenActions: task.scope.forbidden_actions,
     });
-    const outputSchemaPath = path.resolve(cwd, agent.outputs.schema);
+    const outputSchemaPath = path.resolve(definitionsRoot, agent.outputs.schema);
     const parsed = injectedExecutor
       ? await injectedExecutor({ agent, prompt, cwd, mode, timeoutMs, outputSchemaPath })
       : parseAgentRuntimeResult(await adapter!.run(

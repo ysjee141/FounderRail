@@ -30,9 +30,9 @@ function validateGraph(workflow: WorkflowDefinition): void {
   for (const id of ids) visit(id);
 }
 
-export async function loadWorkflow(root: string, id: string): Promise<WorkflowDefinition> {
+export async function loadWorkflow(root: string, id: string, definitionsRoot = root): Promise<WorkflowDefinition> {
   if (!/^[a-z0-9-]+$/.test(id)) throw new InvalidWorkflowError(`Invalid workflow id: ${id}`);
-  const file = path.join(root, "workflows", `${id}.yaml`);
+  const file = path.join(definitionsRoot, "workflows", `${id}.yaml`);
   const workflow = workflowDefinitionSchema.parse(parse(await readFile(file, "utf8")));
   if (workflow.id !== id) throw new InvalidWorkflowError(`Workflow file name and id differ: ${id} != ${workflow.id}`);
   validateGraph(workflow);
