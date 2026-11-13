@@ -3,6 +3,7 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { canReadPath } from "../agents/path-policy.js";
 import type { AgentDefinition } from "../agents/types.js";
+import { loadApprovedKnowledgeContext } from "../knowledge/cards.js";
 
 export interface ContextDocument {
   path: string;
@@ -64,6 +65,18 @@ export async function loadAgentContext(
       content: buffer.toString("utf8"),
       sha256: createHash("sha256").update(buffer).digest("hex"),
     });
+  }
+  let knowledge: ContextDocument[] = [];
+  try {
+    knowledge = await loadApprovedKnowledgeContext(root, agent.id);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const document of knowledge) {
+    const bytes = Buffer.byteLength(document.content);
+    if (bytes > limits.perFileBytes || totalBytes + bytes > limits.totalBytes) continue;
+    totalBytes += bytes;
+    documents.push(document);
   }
   return documents;
 }

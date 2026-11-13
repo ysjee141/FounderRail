@@ -24,6 +24,7 @@ npm link
 team doctor
 team init --runtime codex
 team bootstrap status
+team knowledge check
 ```
 
 `team init`은 다음을 수행한다.
@@ -33,6 +34,8 @@ team bootstrap status
 - 기존 파일을 덮어쓰지 않고 `company/`, `knowledge/`, `work/` 템플릿 생성
 
 먼저 `company/profile.yaml`의 `undecided` 값을 실제 사실로 바꾼다. 모르는 값은 추측하지 않고 그대로 남긴다.
+
+초기 `team knowledge check`는 active module에 검증된 Card가 없으므로 실패하는 것이 정상이다. [Knowledge 운영](./knowledge.md)에 따라 실제 제품에 필요한 source와 Card를 검토한 뒤 `team knowledge compile`을 실행한다.
 
 ## 기본 점검
 
