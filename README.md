@@ -17,6 +17,7 @@ team agents
 team ask finance-ops "이번 달 runway 계산에 필요한 자료를 정리해줘" --dry-run
 team task create --owner product-growth --objective "고객 문제를 검증한다" --why "구현 전 가장 위험한 가정을 확인한다"
 team workflow inspect idea-validation
+team inbox
 team run --prompt "현재 저장소의 상태를 한 문단으로 요약해줘"
 ```
 
@@ -27,5 +28,7 @@ Runtime 실행 이벤트는 `.agent-team/events/<run-id>.jsonl`에 저장됩니�
 Task와 Handoff는 `.agent-team/state.db`에 저장됩니다. Task 상태는 정의된 상태 머신을 통해서만 변경되며, Handoff는 Agent 결과 schema를 통과한 불변 기록입니다.
 
 Workflow는 `workflows/*.yaml`에 정의합니다. loader는 dependency와 cycle을 검증하며, 실행기는 이전 단계의 전체 대화 대신 검증된 Handoff만 다음 Agent에 전달합니다.
+
+중요 행동은 `team approval request`로 Human Inbox에 들어갑니다. 요청은 승인 대상 artifact의 SHA-256과 결합되며, 파일이 변경되면 기존 승인을 사용할 수 없습니다.
 
 전체 설계와 단계별 구현 계획은 [agent-team-harness-plan.md](./agent-team-harness-plan.md)를 참고합니다.
