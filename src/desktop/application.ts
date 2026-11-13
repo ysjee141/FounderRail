@@ -9,11 +9,20 @@ import { TaskStore } from "../store/task-store.js";
 import type { RuntimeName, RuntimeProbe } from "../runtime/types.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "../runtime/registry.js";
 import { loadWorkflow } from "../workflows/loader.js";
-import type { TaskContract } from "../tasks/contracts.js";
+import type { HandoffContract, TaskContract } from "../tasks/contracts.js";
 import type { WorkflowRun } from "../workflows/runs.js";
 import type { ApprovalRequest } from "../approvals/contracts.js";
 
 const execFileAsync = promisify(execFile);
+
+let runtimeProbeCache: { expiresAt: number; result: Promise<RuntimeProbe[]> } | undefined;
+
+function probeRuntimes(): Promise<RuntimeProbe[]> {
+  if (runtimeProbeCache && runtimeProbeCache.expiresAt > Date.now()) return runtimeProbeCache.result;
+  const result = Promise.all(getRuntimeAdapters().map((adapter) => adapter.probe()));
+  runtimeProbeCache = { expiresAt: Date.now() + 30_000, result };
+  return result;
+}
 
 export interface DesktopProjectSnapshot {
   root: string;
@@ -25,6 +34,7 @@ export interface DesktopProjectSnapshot {
   agents: Array<{ id: string; name: string; description: string }>;
   workflows: Array<{ id: string; name: string; description: string; stepCount: number }>;
   tasks: TaskContract[];
+  handoffs: HandoffContract[];
   runs: WorkflowRun[];
   approvals: ApprovalRequest[];
 }
@@ -79,18 +89,20 @@ export async function inspectDesktopProject(candidateRoot: string, harnessRoot: 
   }
 
   const [runtimes, definitions, git] = await Promise.all([
-    Promise.all(getRuntimeAdapters().map((adapter) => adapter.probe())),
+    probeRuntimes(),
     readHarnessDefinitions(harnessRoot),
     readGitStatus(root),
   ]);
 
   let tasks: TaskContract[] = [];
+  let handoffs: HandoffContract[] = [];
   let runs: WorkflowRun[] = [];
   let approvals: ApprovalRequest[] = [];
   if (initialized) {
     const store = await TaskStore.open(path.join(stateDirectory(root), "state.db"));
     try {
       tasks = store.listTasks();
+      handoffs = tasks.flatMap((task) => store.listHandoffs(task.id));
       runs = store.listWorkflowRuns();
       approvals = store.listPendingApprovals();
     } finally {
@@ -107,6 +119,7 @@ export async function inspectDesktopProject(candidateRoot: string, harnessRoot: 
     git,
     ...definitions,
     tasks,
+    handoffs,
     runs,
     approvals,
   };
