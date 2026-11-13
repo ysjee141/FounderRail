@@ -8,6 +8,8 @@ import { loadAgentContext } from "./context/loader.js";
 import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
+import { TaskStore } from "./store/task-store.js";
+import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
 import type { RuntimeMode } from "./runtime/types.js";
 
@@ -25,6 +27,11 @@ function usage(): void {
   team agents
   team ask <agent-id> <request> [--dry-run]
   team bootstrap status
+  team task create --owner <agent-id> --objective <text> --why <text>
+  team task show <task-id>
+  team task transition <task-id> <status>
+  team handoff record --task <task-id> --agent <agent-id> --from <json-file>
+  team handoff list <task-id>
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -124,6 +131,75 @@ async function bootstrapStatus(root: string, args: string[]): Promise<void> {
   console.log(JSON.stringify(await readBootstrapStatus(root), null, 2));
 }
 
+async function withTaskStore<T>(root: string, operation: (store: TaskStore) => T): Promise<T> {
+  const store = await TaskStore.open(path.join(stateDirectory(root), "state.db"));
+  try {
+    return operation(store);
+  } finally {
+    store.close();
+  }
+}
+
+async function task(root: string, args: string[]): Promise<void> {
+  if (args[0] === "create") {
+    const owner = valueAfter(args, "--owner");
+    const objective = valueAfter(args, "--objective");
+    const why = valueAfter(args, "--why");
+    if (!owner || !isAgentId(owner) || !objective || !why) {
+      throw new Error("Usage: team task create --owner <agent-id> --objective <text> --why <text>");
+    }
+    const created = await withTaskStore(root, (store) => store.createTask({
+      owner_agent: owner,
+      objective,
+      why,
+      inputs: [],
+      scope: { writable_paths: [], forbidden_actions: [] },
+      acceptance: [],
+      checks: [],
+      risk_flags: [],
+      approval: { required_for: [] },
+    }));
+    console.log(JSON.stringify(created, null, 2));
+    return;
+  }
+  if (args[0] === "show" && args[1]) {
+    console.log(JSON.stringify(await withTaskStore(root, (store) => store.getTask(args[1] as string)), null, 2));
+    return;
+  }
+  if (args[0] === "transition" && args[1] && args[2]) {
+    const status = taskStatusSchema.parse(args[2]);
+    console.log(JSON.stringify(await withTaskStore(root, (store) => store.transitionTask(args[1] as string, status)), null, 2));
+    return;
+  }
+  throw new Error("Usage: team task <create|show|transition> ...");
+}
+
+async function handoff(root: string, args: string[]): Promise<void> {
+  if (args[0] === "record") {
+    const taskId = valueAfter(args, "--task");
+    const agentId = valueAfter(args, "--agent");
+    const source = valueAfter(args, "--from");
+    if (!taskId || !agentId || !isAgentId(agentId) || !source) {
+      throw new Error("Usage: team handoff record --task <task-id> --agent <agent-id> --from <json-file>");
+    }
+    const { readFile, realpath } = await import("node:fs/promises");
+    const rootReal = await realpath(root);
+    const sourceReal = await realpath(path.resolve(root, source));
+    const relativeSource = path.relative(rootReal, sourceReal);
+    if (relativeSource.startsWith("..") || path.isAbsolute(relativeSource)) {
+      throw new Error("Handoff source must be inside the project");
+    }
+    const result = agentResultSchema.parse(JSON.parse(await readFile(sourceReal, "utf8")));
+    console.log(JSON.stringify(await withTaskStore(root, (store) => store.recordHandoff(taskId, agentId, result)), null, 2));
+    return;
+  }
+  if (args[0] === "list" && args[1]) {
+    console.log(JSON.stringify({ handoffs: await withTaskStore(root, (store) => store.listHandoffs(args[1] as string)) }, null, 2));
+    return;
+  }
+  throw new Error("Usage: team handoff <record|list> ...");
+}
+
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const root = process.cwd();
@@ -137,6 +213,8 @@ async function main(): Promise<void> {
   else if (command === "agents") await listAgents(root);
   else if (command === "ask") await ask(root, args);
   else if (command === "bootstrap") await bootstrapStatus(root, args);
+  else if (command === "task") await task(root, args);
+  else if (command === "handoff") await handoff(root, args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }

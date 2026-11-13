@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-team.local/schemas/task.schema.json",
+  "title": "Task Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "owner_agent", "objective", "why", "inputs", "scope", "acceptance", "checks", "risk_flags", "approval", "status", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+    "goal_id": { "type": ["string", "null"] },
+    "owner_agent": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
+    "objective": { "type": "string", "minLength": 1 },
+    "why": { "type": "string", "minLength": 1 },
+    "inputs": { "type": "array", "items": { "type": "string" } },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["writable_paths", "forbidden_actions"],
+      "properties": {
+        "writable_paths": { "type": "array", "items": { "type": "string" } },
+        "forbidden_actions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "acceptance": { "type": "array", "items": { "type": "string" } },
+    "checks": { "type": "array", "items": { "type": "string" } },
+    "risk_flags": { "type": "array", "items": { "type": "string" } },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_for"],
+      "properties": { "required_for": { "type": "array", "items": { "type": "string" } } }
+    },
+    "status": { "enum": ["draft", "ready", "running", "blocked", "in_review", "waiting_approval", "completed", "failed", "cancelled"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}
