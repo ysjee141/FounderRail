@@ -1,0 +1,32 @@
+version: 1
+
+business:
+  home_jurisdiction: KR
+  entity_status: undecided
+  target_markets: [KR]
+  customer_type: undecided
+  revenue_model: [undecided]
+
+product:
+  form: undecided
+  distribution: [undecided]
+  stage: idea
+  has_ai_features: undecided
+  allows_user_content: undecided
+
+data:
+  categories: [undecided]
+  sensitive_categories: []
+  minors_possible: undecided
+  storage_regions: [undecided]
+
+technology:
+  cloud: undecided
+  auth: undecided
+  payment_provider: undecided
+  analytics: undecided
+
+operations:
+  availability_target: best_effort
+  recovery_target: undecided
+  support_channel: undecided

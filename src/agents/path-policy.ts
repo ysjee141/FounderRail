@@ -1,6 +1,6 @@
 import path from "node:path";
 
-function normalizedRelativePath(candidate: string): string | undefined {
+export function normalizeScopedPath(candidate: string): string | undefined {
   if (path.isAbsolute(candidate)) return undefined;
   const portable = candidate.replaceAll("\\", "/");
   if (portable.split("/").includes("..")) return undefined;
@@ -10,7 +10,7 @@ function normalizedRelativePath(candidate: string): string | undefined {
 }
 
 export function matchesScope(candidate: string, scope: string): boolean {
-  const normalized = normalizedRelativePath(candidate);
+  const normalized = normalizeScopedPath(candidate);
   if (!normalized) return false;
   if (scope.endsWith("/**")) {
     const prefix = scope.slice(0, -3).replace(/\/$/, "");
