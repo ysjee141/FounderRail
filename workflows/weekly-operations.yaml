@@ -1,0 +1,34 @@
+id: weekly-operations
+name: Weekly Operations
+description: 고객, 제품, 현금과 위험의 변화를 한 페이지의 창업자 결정 자료로 통합한다.
+steps:
+  - id: product-update
+    agent: product-growth
+    prompt: 이번 주 고객 학습, 지표 변화, 실험 결과와 다음 후보를 요약한다.
+    requires: []
+    when: always
+    retry: 1
+  - id: engineering-update
+    agent: engineering
+    prompt: 제품 변경, 신뢰성, blocker, 기술 부채와 다음 작업을 요약한다.
+    requires: []
+    when: always
+    retry: 1
+  - id: finance-update
+    agent: finance-ops
+    prompt: 현금, 매출, 비용, runway와 임박한 의무의 변화만 보고한다.
+    requires: []
+    when: always
+    retry: 1
+  - id: risk-update
+    agent: risk-quality
+    prompt: 새 위험, overdue 통제, backup과 복구 준비의 변화만 보고한다.
+    requires: []
+    when: always
+    retry: 1
+  - id: founder-briefing
+    agent: founder-office
+    prompt: 네 영역의 근거를 한 페이지로 통합하고 창업자가 결정할 항목과 다음 주 후보 세 개를 제시한다.
+    requires: [product-update, engineering-update, finance-update, risk-update]
+    when: always
+    retry: 1
