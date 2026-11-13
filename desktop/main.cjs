@@ -150,6 +150,18 @@ function registerIpc() {
     return (await service()).startDesktopFeatureDelivery(activeProjectRoot, harnessRoot, input);
   });
 
+  ipcMain.handle("workflows:startOperational", async (event, input) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    return (await service()).startDesktopOperationalWorkflow(activeProjectRoot, harnessRoot, input);
+  });
+
+  ipcMain.handle("knowledge:inspect", async (event) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    return (await service()).getDesktopKnowledgeSnapshot(activeProjectRoot);
+  });
+
   ipcMain.handle("reviews:getTask", async (event, taskId) => {
     assertTrustedSender(event);
     if (!activeProjectRoot) throw new Error("Open a project folder first.");

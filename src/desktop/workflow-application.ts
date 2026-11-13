@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { decideApproval, requestWorkflowApproval } from "../approvals/service.js";
 import { resolveExistingProjectFile } from "../security/project-path.js";
+import { auditKnowledge } from "../knowledge/cards.js";
 import { TaskStore } from "../store/task-store.js";
 import { createTaskSchema, type CreateTask } from "../tasks/contracts.js";
 import type { ApprovalDecision } from "../approvals/contracts.js";
@@ -18,6 +19,7 @@ import { inspectDesktopProject } from "./application.js";
 
 const execFileAsync = promisify(execFile);
 const riskFlagSchema = z.enum(["security", "personal-data", "payments", "authentication", "database", "network"]);
+const operationalWorkflowSchema = z.enum(["weekly-operations", "monthly-close", "incident"]);
 
 function openStore(projectRoot: string): Promise<TaskStore> {
   return TaskStore.open(path.join(projectRoot, ".agent-team", "state.db"));
@@ -66,6 +68,13 @@ const desktopFeatureInputSchema = z.object({
   problem: z.string().trim().min(1).max(3000),
   writablePaths: z.array(z.string().trim().min(1).max(240)).min(1).max(25),
   acceptance: z.array(z.string().trim().min(1).max(300)).min(1).max(12),
+  riskFlags: z.array(riskFlagSchema).max(6),
+}).strict();
+
+const operationalInputSchema = z.object({
+  workflowId: operationalWorkflowSchema,
+  objective: z.string().trim().min(1).max(180),
+  context: z.string().trim().min(1).max(5000),
   riskFlags: z.array(riskFlagSchema).max(6),
 }).strict();
 
@@ -155,6 +164,74 @@ export async function startDesktopFeatureDelivery(
   const parsed = desktopFeatureInputSchema.parse(rawInput);
   const input = buildFeatureTask(parsed);
   return launchWorkflow(projectRoot, harnessRoot, input, "feature-delivery");
+}
+
+export async function startDesktopOperationalWorkflow(
+  projectRoot: string,
+  harnessRoot: string,
+  rawInput: unknown,
+) {
+  const { workflowId, objective, context, riskFlags } = operationalInputSchema.parse(rawInput);
+  const snapshot = await inspectDesktopProject(projectRoot, harnessRoot);
+  if (!snapshot.initialized) throw new Error("먼저 Harness Runtime을 설정하세요.");
+
+  const owner = workflowId === "monthly-close" ? "finance-ops" : workflowId === "incident" ? "risk-quality" : "founder-office";
+  const why = workflowId === "monthly-close"
+    ? "창업자가 제공한 월간 사업·재무 자료를 검토해 다음 달 결정을 준비한다."
+    : workflowId === "incident"
+      ? "기술·고객·데이터 영향을 정리하고 외부 행동 전 사람 결정을 준비한다."
+      : "이번 주 사업·제품·재무·위험의 변화를 한 페이지로 정리한다.";
+  const acceptance = workflowId === "monthly-close"
+    ? ["매출·지출·현금·runway 변화를 구분한다.", "미확인 자료와 창업자가 결정할 목표·예산 항목을 기록한다."]
+    : workflowId === "incident"
+      ? ["기술·고객·데이터 영향을 구분한다.", "증거 보존, 복구 선택지와 승인 대상을 정리한다."]
+      : ["고객·제품·재무·위험 변화를 요약한다.", "창업자 결정 항목과 다음 주 후보를 제시한다."];
+  const input: CreateTask = createTaskSchema.parse({
+    owner_agent: owner,
+    objective,
+    why,
+    inputs: [context],
+    scope: {
+      writable_paths: [],
+      forbidden_actions: ["고객 또는 공급자에게 연락", "결제", "가격 변경", "생산 시스템 변경", "데이터 삭제", "배포", "외부 공지 발송"],
+    },
+    acceptance,
+    checks: ["근거, 가정과 미확인 정보를 구분한다.", "외부 행동과 중요 결정은 창업자 승인 대상으로 표시한다."],
+    risk_flags: workflowId === "incident" && riskFlags.length === 0 ? ["security"] : riskFlags,
+    approval: { required_for: ["external_write", "payment", "production_change", "customer_notice"] },
+  });
+  return launchWorkflow(projectRoot, harnessRoot, input, workflowId);
+}
+
+export async function getDesktopKnowledgeSnapshot(projectRoot: string) {
+  try {
+    const audit = await auditKnowledge(projectRoot);
+    return {
+      available: true,
+      qualified: audit.qualified,
+      checkedAt: audit.checkedAt,
+      activeModules: audit.activeModules,
+      validSources: audit.validSources.map(({ id, title, authority, url, module, jurisdiction, verified_at, review_after }) => ({
+        id, title, authority, url, module, jurisdiction, verified_at, review_after,
+      })),
+      validCards: audit.validCards.map(({ id, title, module, claim, action, risk, professional_review, review_after }) => ({
+        id, title, module, claim, action, risk, professional_review, review_after,
+      })),
+      coverageGaps: audit.coverageGaps,
+      issues: audit.issues,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      qualified: false,
+      checkedAt: new Date().toISOString(),
+      activeModules: [],
+      validSources: [],
+      validCards: [],
+      coverageGaps: [],
+      issues: [{ code: "knowledge_unavailable", subject: "knowledge", message: error instanceof Error ? error.message : String(error) }],
+    };
+  }
 }
 
 export async function getDesktopTaskReview(projectRoot: string, taskId: string) {
