@@ -21,7 +21,10 @@ npm link
 ```bash
 npm run test:live -- --runtime codex
 npm run test:live -- --runtime all --require-all
+npm run test:live:workflow -- codex
 ```
+
+workflow smoke는 임시 디렉터리에 합성 interview·finance fixture를 만들고 Product, Finance, Founder 세션과 영속 Handoff를 검증한 뒤 디렉터리를 삭제한다. 실제 사업 evidence로 사용하면 안 된다.
 
 ## 프로젝트 초기화
 

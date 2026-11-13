@@ -12,6 +12,7 @@
     "test": "tsx --test test/*.test.ts test/**/*.test.ts",
     "test:e2e": "tsx --test test/e2e/**/*.test.ts",
     "test:live": "tsx scripts/live-contract.ts",
+    "test:live:workflow": "tsx scripts/live-workflow-smoke.ts",
     "team": "tsx src/cli.ts"
   },
   "dependencies": {
