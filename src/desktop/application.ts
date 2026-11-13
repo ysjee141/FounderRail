@@ -135,7 +135,7 @@ export async function initializeDesktopProject(
   const probe = await adapter.probe();
   if (!probe.available) throw new Error(`${runtime} is not available: ${probe.error ?? "command not found"}`);
   await initializeConfig(root, runtime);
-  await scaffoldProject(root);
+  await scaffoldProject(root, path.join(harnessRoot, "templates"));
   return inspectDesktopProject(root, harnessRoot);
 }
 
