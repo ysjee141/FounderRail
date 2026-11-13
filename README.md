@@ -63,4 +63,5 @@ Engineering 변경은 `.agent-team/worktrees/<task-id>`의 전용 branch에서 �
 - [운영 안내](./docs/operations.md)
 - [복구 안내](./docs/recovery.md)
 - [Knowledge 운영](./docs/knowledge.md)
+- [스톱워치 운영 실습 가이드](./docs/working-guide-stopwatch.md)
 - [구현 현황과 남은 단계](./docs/implementation-status.md)
