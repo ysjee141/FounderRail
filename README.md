@@ -41,6 +41,8 @@ Workflow 실행 상태는 Task와 함께 SQLite에 저장됩니다. 실패·중�
 
 중요 행동은 `team approval request`로 Human Inbox에 들어갑니다. 요청은 승인 대상 artifact의 SHA-256과 결합되며, 파일이 변경되면 기존 승인을 사용할 수 없습니다.
 
+Workflow에는 `type: approval` step을 둘 수 있습니다. 해당 지점에서 run과 Task가 함께 멈추고, 승인 결정 후 완료되거나 같은 run의 다음 step부터 재개됩니다. `feature-delivery`는 release checklist에 결합된 마지막 승인 step을 포함합니다.
+
 Engineering 변경은 `.agent-team/worktrees/<task-id>`의 전용 branch에서 수행합니다. Harness는 worktree와 diff evidence를 만들지만 merge, production 배포, worktree 삭제는 자동 실행하지 않습니다.
 
 전체 설계와 단계별 구현 계획은 [agent-team-harness-plan.md](./agent-team-harness-plan.md)를 참고합니다.

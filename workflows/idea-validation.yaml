@@ -3,6 +3,7 @@ name: Idea Validation
 description: 고객 문제, 가격·비용과 가장 위험한 가정을 검토해 창업자의 실험 결정을 준비한다.
 steps:
   - id: product-discovery
+    type: agent
     agent: product-growth
     prompt: 고객, 문제, 기존 대안, 가장 위험한 가정과 1~2주 검증 실험을 제안한다.
     requires: []
@@ -10,6 +11,7 @@ steps:
     retry: 1
 
   - id: finance-review
+    type: agent
     agent: finance-ops
     prompt: 앞선 제품 가설의 비용, 가격 가설, 최대 허용 비용과 runway 영향을 검토한다.
     requires: [product-discovery]
@@ -17,6 +19,7 @@ steps:
     retry: 1
 
   - id: founder-synthesis
+    type: agent
     agent: founder-office
     prompt: 제품·재무 검토를 바탕으로 선택지, 미확인 가정과 창업자가 결정할 항목을 정리한다.
     requires: [product-discovery, finance-review]

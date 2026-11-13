@@ -12,7 +12,7 @@ import { collectWorktreeEvidence, createEngineeringWorktree } from "./engineerin
 import { calculateRunway } from "./finance/runway.js";
 import { deriveRiskFlags } from "./risk/router.js";
 import { approvalDecisionSchema } from "./approvals/contracts.js";
-import { decideApproval, requestApproval } from "./approvals/service.js";
+import { decideApproval, requestApproval, requestWorkflowApproval } from "./approvals/service.js";
 import { resolveExistingProjectFile } from "./security/project-path.js";
 import { TaskStore } from "./store/task-store.js";
 import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
@@ -243,7 +243,13 @@ async function workflow(root: string, args: string[]): Promise<void> {
     if (!taskId) throw new Error("--task is required");
     const definition = await loadWorkflow(root, args[1]);
     const runner = await createRuntimeWorkflowRunner(root, timeoutMs);
-    const result = await withTaskStore(root, (store) => executeWorkflow(definition, store, taskId, runner));
+    const result = await withTaskStore(root, (store) => executeWorkflow(
+      definition,
+      store,
+      taskId,
+      runner,
+      ({ runId, step }) => requestWorkflowApproval(root, store, runId, step.id, step.action, step.artifact).then(() => undefined),
+    ));
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -252,7 +258,13 @@ async function workflow(root: string, args: string[]): Promise<void> {
     const run = await withTaskStore(root, (store) => store.getWorkflowRun(runId));
     const definition = await loadWorkflow(root, run.workflow_id);
     const runner = await createRuntimeWorkflowRunner(root, timeoutMs);
-    const result = await withTaskStore(root, (store) => resumeWorkflow(definition, store, runId, runner));
+    const result = await withTaskStore(root, (store) => resumeWorkflow(
+      definition,
+      store,
+      runId,
+      runner,
+      ({ step }) => requestWorkflowApproval(root, store, runId, step.id, step.action, step.artifact).then(() => undefined),
+    ));
     console.log(JSON.stringify(result, null, 2));
     return;
   }

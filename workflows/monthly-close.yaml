@@ -3,30 +3,35 @@ name: Monthly Close
 description: 월간 사업·제품·재무·기술·위험 상태를 다음 달 목표와 예산 결정 자료로 만든다.
 steps:
   - id: product-month
+    type: agent
     agent: product-growth
     prompt: acquisition, activation, retention과 고객 학습을 출처와 함께 요약한다.
     requires: []
     when: always
     retry: 1
   - id: engineering-month
+    type: agent
     agent: engineering
     prompt: reliability, 기술 부채, 인프라 비용과 주요 변경을 요약한다.
     requires: []
     when: always
     retry: 1
   - id: finance-close
+    type: agent
     agent: finance-ops
     prompt: 매출, 지출, 현금, runway, 증빙 공백과 임박한 의무를 정리한다.
     requires: []
     when: always
     retry: 1
   - id: risk-baseline
+    type: agent
     agent: risk-quality
     prompt: 자산, 접근, 공급자, backup, dependency와 미해결 finding을 점검한다.
     requires: []
     when: always
     retry: 1
   - id: founder-month
+    type: agent
     agent: founder-office
     prompt: 다음 달 목표와 예산을 결정할 수 있도록 변화, 선택지, 미확인 가정을 통합한다.
     requires: [product-month, engineering-month, finance-close, risk-baseline]

@@ -11,6 +11,8 @@ export const approvalRequestSchema = z.object({
   action: z.string().min(1),
   artifact_path: z.string().min(1),
   artifact_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  workflow_run_id: z.string().regex(/^RUN-[A-Z0-9-]+$/).nullable().default(null),
+  workflow_step_id: z.string().regex(/^[a-z0-9-]+$/).nullable().default(null),
   status: z.enum(["pending", "approved", "rejected", "changes_requested"]),
   created_at: z.iso.datetime(),
   resolved_at: z.iso.datetime().nullable(),
@@ -23,6 +25,7 @@ export function createApprovalRequest(
   action: string,
   artifactPath: string,
   artifactSha256: string,
+  workflow?: { runId: string; stepId: string },
   now = new Date(),
 ): ApprovalRequest {
   return approvalRequestSchema.parse({
@@ -31,6 +34,8 @@ export function createApprovalRequest(
     action,
     artifact_path: artifactPath,
     artifact_sha256: artifactSha256,
+    workflow_run_id: workflow?.runId ?? null,
+    workflow_step_id: workflow?.stepId ?? null,
     status: "pending",
     created_at: now.toISOString(),
     resolved_at: null,

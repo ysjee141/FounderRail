@@ -3,6 +3,7 @@ import { agentResultSchema, type AgentResult, type HandoffContract } from "../ta
 import type { WorkflowRun } from "./runs.js";
 import type {
   AgentStepRequest,
+  ApprovalStepRequest,
   WorkflowDefinition,
   WorkflowExecutionResult,
   WorkflowStep,
@@ -10,6 +11,7 @@ import type {
 } from "./types.js";
 
 export type AgentStepRunner = (request: AgentStepRequest) => Promise<AgentResult>;
+export type ApprovalStepRunner = (request: ApprovalStepRequest) => Promise<void>;
 
 function shouldRun(step: WorkflowStep, riskFlags: string[]): boolean {
   if (step.when === "always") return true;
@@ -24,6 +26,7 @@ function executionResult(taskStore: TaskStore, run: WorkflowRun): WorkflowExecut
     status: step.status,
     attempts: step.attempts,
     ...(step.handoff_id ? { handoff: taskStore.getHandoff(step.handoff_id) } : {}),
+    ...(step.approval_id ? { approval: taskStore.getApproval(step.approval_id) } : {}),
     ...(step.error ? { error: step.error } : {}),
   }));
   return { runId: run.id, workflowId: run.workflow_id, taskId: run.task_id, status: run.status, steps };
@@ -38,6 +41,7 @@ async function driveWorkflow(
   taskStore: TaskStore,
   initialRun: WorkflowRun,
   runner: AgentStepRunner,
+  approvalRunner?: ApprovalStepRunner,
 ): Promise<WorkflowExecutionResult> {
   const task = taskStore.getTask(initialRun.task_id);
   let run = initialRun;
@@ -56,6 +60,18 @@ async function driveWorkflow(
     if (!shouldRun(ready, task.risk_flags)) {
       run = taskStore.skipWorkflowStep(run.id, ready.id);
       continue;
+    }
+
+    if (ready.type === "approval") {
+      try {
+        if (!approvalRunner) throw new Error(`Workflow ${workflow.id} requires an approval runner`);
+        await approvalRunner({ workflow, step: ready, task, runId: run.id });
+        run = taskStore.getWorkflowRun(run.id);
+        return executionResult(taskStore, run);
+      } catch (error) {
+        run = taskStore.failWorkflowStep(run.id, ready.id, error instanceof Error ? error.message : String(error));
+        return executionResult(taskStore, run);
+      }
     }
 
     let attemptsThisExecution = 0;
@@ -102,9 +118,10 @@ export async function executeWorkflow(
   taskStore: TaskStore,
   taskId: string,
   runner: AgentStepRunner,
+  approvalRunner?: ApprovalStepRunner,
 ): Promise<WorkflowExecutionResult> {
   const run = taskStore.startWorkflowRun(workflow, taskId);
-  return driveWorkflow(workflow, taskStore, run, runner);
+  return driveWorkflow(workflow, taskStore, run, runner, approvalRunner);
 }
 
 export async function resumeWorkflow(
@@ -112,7 +129,8 @@ export async function resumeWorkflow(
   taskStore: TaskStore,
   runId: string,
   runner: AgentStepRunner,
+  approvalRunner?: ApprovalStepRunner,
 ): Promise<WorkflowExecutionResult> {
   const run = taskStore.resumeWorkflowRun(runId, workflow);
-  return driveWorkflow(workflow, taskStore, run, runner);
+  return driveWorkflow(workflow, taskStore, run, runner, approvalRunner);
 }

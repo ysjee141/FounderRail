@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { AgentRegistry } from "../../src/agents/registry.js";
-import { decideApproval, requestApproval } from "../../src/approvals/service.js";
+import { decideApproval, requestWorkflowApproval } from "../../src/approvals/service.js";
 import { scaffoldProject } from "../../src/context/scaffold.js";
 import { writeScopedArtifact } from "../../src/context/scoped-writer.js";
 import { TaskStore } from "../../src/store/task-store.js";
@@ -56,15 +56,23 @@ test("feature task reaches human-approved completion using structured handoffs",
       risks: [],
       requested_next_agent: null,
     };
-  });
+  }, ({ runId, step }) => requestWorkflowApproval(
+    root,
+    store,
+    runId,
+    step.id,
+    step.action,
+    step.artifact,
+  ).then(() => undefined));
 
-  assert.equal(execution.status, "completed");
+  assert.equal(execution.status, "waiting_approval");
   assert.deepEqual(executedAgents, ["product-growth", "engineering", "risk-quality", "founder-office"]);
-  assert.equal(store.getTask(task.id).status, "in_review");
+  assert.equal(store.getTask(task.id).status, "waiting_approval");
   assert.equal(store.listHandoffs(task.id).length, 4);
 
-  const artifact = `work/releases/${task.id}.md`;
-  const approval = await requestApproval(root, store, task.id, "release", artifact);
+  const approval = execution.steps.find((step) => step.stepId === "release-approval")?.approval;
+  assert.ok(approval);
   await decideApproval(root, store, approval.id, "approve", "Fake E2E evidence verified");
   assert.equal(store.getTask(task.id).status, "completed");
+  assert.equal(store.getWorkflowRun(execution.runId).status, "completed");
 });

@@ -31,13 +31,26 @@ Task와 Handoff는 `.agent-team/state.db`에 저장된다. Agent 사이에는 �
 
 ## 승인
 
-```bash
-team approval request --task <task-id> --action release --artifact work/releases/<file>
-team inbox
-team approval decide <approval-id> approve --reason "테스트와 rollback 증거 확인"
+Workflow YAML은 `type: approval` step을 지원한다. `action`, 검토할 `artifact`, 선행 step을 선언하면 실행기가 artifact SHA-256에 결합된 Human Inbox 요청을 만들고 run을 `waiting_approval`에서 멈춘다.
+
+```yaml
+- id: release-approval
+  type: approval
+  action: release
+  artifact: company/release-checklist.md
+  requires: [scope-review]
+  when: always
 ```
 
-승인 후 실제 외부 action을 실행하는 구성요소는 승인된 hash와 현재 artifact hash를 다시 비교해야 한다. 현재 Harness는 승인 상태를 기록하지만 production 배포를 실행하지 않는다.
+```bash
+team inbox
+team approval decide <approval-id> approve --reason "테스트와 rollback 증거 확인"
+team workflow resume <run-id> # 승인 뒤 후속 step이 있을 때
+```
+
+승인 시 artifact가 요청 이후 바뀌었다면 결정을 거부한다. 마지막 step의 승인은 Task와 run을 완료하고, 중간 승인은 Task와 run을 재개 가능 상태로 전환한다. `request_changes`는 새 artifact hash로 승인 요청을 다시 만들게 하며 `reject`는 run을 실패 처리한다. Workflow 밖의 단독 승인은 기존 `team approval request --task ...` 명령으로 만들 수 있다.
+
+승인 후 실제 외부 action을 실행하는 구성요소도 승인된 hash와 현재 artifact hash를 다시 비교해야 한다. 현재 Harness는 승인 상태를 기록하지만 production 배포를 실행하지 않는다.
 
 ## Engineering worktree
 

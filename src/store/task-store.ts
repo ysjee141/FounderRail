@@ -272,7 +272,7 @@ export class TaskStore {
 
   failWorkflowStep(runId: string, stepId: string, error: string): WorkflowRun {
     const current = this.getWorkflowRun(runId);
-    this.assertWorkflowStep(current, stepId, ["running"]);
+    this.assertWorkflowStep(current, stepId, ["pending", "running"]);
     const updated = workflowRunSchema.parse({
       ...current,
       status: "failed",
@@ -339,6 +339,48 @@ export class TaskStore {
     if (result.changes !== 1) throw new Error(`Concurrent workflow run update detected: ${current.id}`);
   }
 
+  requestWorkflowStepApproval(
+    runId: string,
+    stepId: string,
+    action: string,
+    artifactPath: string,
+    artifactSha256: string,
+  ): { run: WorkflowRun; approval: ApprovalRequest } {
+    const current = this.getWorkflowRun(runId);
+    if (current.status !== "running") throw new Error(`Workflow run ${runId} is ${current.status}`);
+    const step = this.assertWorkflowStep(current, stepId, ["pending"]);
+    if (step.step_type !== "approval") throw new Error(`Workflow step is not an approval step: ${stepId}`);
+    const approval = createApprovalRequest(
+      current.task_id,
+      action,
+      artifactPath,
+      artifactSha256,
+      { runId, stepId },
+    );
+    const updated = workflowRunSchema.parse({
+      ...current,
+      status: "waiting_approval",
+      steps: current.steps.map((item) => item.step_id === stepId
+        ? { ...item, status: "waiting_approval", attempts: item.attempts + 1, approval_id: approval.id, error: null }
+        : item),
+      updated_at: new Date().toISOString(),
+    });
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.transitionTask(current.task_id, "waiting_approval");
+      this.db.prepare(`
+        INSERT INTO approvals (id, task_id, status, document, created_at, resolved_at)
+        VALUES (?, ?, ?, ?, ?, NULL)
+      `).run(approval.id, approval.task_id, approval.status, JSON.stringify(approval), approval.created_at);
+      this.saveWorkflowRun(current, updated);
+      this.db.exec("COMMIT");
+      return { run: updated, approval };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   requestApproval(taskId: string, action: string, artifactPath: string, artifactSha256: string): ApprovalRequest {
     const approval = createApprovalRequest(taskId, action, artifactPath, artifactSha256);
     this.db.exec("BEGIN IMMEDIATE");
@@ -376,7 +418,39 @@ export class TaskStore {
       const current = this.getApproval(id);
       if (current.status !== "pending") throw new Error(`Approval already decided: ${id}`);
       const status = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : "changes_requested";
-      const taskStatus = decision === "approve" ? "completed" : decision === "reject" ? "cancelled" : "running";
+      const workflowApproval = current.workflow_run_id !== null && current.workflow_step_id !== null;
+      let taskStatus: TaskStatus = decision === "approve" ? "completed" : decision === "reject" ? "cancelled" : "running";
+      let workflowUpdate: { current: WorkflowRun; updated: WorkflowRun } | undefined;
+      if (workflowApproval) {
+        const runId = current.workflow_run_id as string;
+        const stepId = current.workflow_step_id as string;
+        const run = this.getWorkflowRun(runId);
+        const step = this.assertWorkflowStep(run, stepId, ["waiting_approval"]);
+        if (step.approval_id !== id) throw new Error(`Workflow step ${stepId} is not waiting for approval ${id}`);
+        const stepStatus = decision === "approve" ? "completed" : decision === "reject" ? "failed" : "pending";
+        const steps = run.steps.map((item) => item.step_id === stepId
+          ? {
+              ...item,
+              status: stepStatus,
+              error: decision === "reject" ? `Approval rejected: ${reason.trim()}` : null,
+            }
+          : item);
+        const finalApproval = decision === "approve"
+          && steps.every((item) => ["completed", "skipped"].includes(item.status));
+        const runStatus = finalApproval
+          ? "completed"
+          : decision === "approve" ? "running" : decision === "reject" ? "failed" : "blocked";
+        taskStatus = finalApproval ? "completed" : decision === "reject" ? "cancelled" : "running";
+        workflowUpdate = {
+          current: run,
+          updated: workflowRunSchema.parse({
+            ...run,
+            status: runStatus,
+            steps,
+            updated_at: new Date().toISOString(),
+          }),
+        };
+      }
       const updated = approvalRequestSchema.parse({
         ...current,
         status,
@@ -388,6 +462,7 @@ export class TaskStore {
       `).run(updated.status, JSON.stringify(updated), updated.resolved_at, id);
       if (result.changes !== 1) throw new Error(`Concurrent approval decision detected: ${id}`);
       this.transitionTask(current.task_id, taskStatus);
+      if (workflowUpdate) this.saveWorkflowRun(workflowUpdate.current, workflowUpdate.updated);
       this.db.exec("COMMIT");
       return updated;
     } catch (error) {
