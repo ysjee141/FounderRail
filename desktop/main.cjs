@@ -4,6 +4,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
 const appRoot = path.resolve(__dirname, "..");
+const harnessRoot = app.isPackaged ? `${appRoot}.unpacked` : appRoot;
 const rendererFile = path.join(__dirname, "renderer", "index.html");
 const runtimeNames = new Set(["claude", "codex", "gemini"]);
 let mainWindow;
@@ -56,6 +57,30 @@ async function writeRecentProjects(projects) {
   await rename(temporary, target);
 }
 
+async function includeCommonCliPaths() {
+  const home = app.getPath("home");
+  const candidates = process.platform === "win32"
+    ? [path.join(home, ".local", "bin"), path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "npm")]
+    : process.platform === "darwin"
+      ? [path.join(home, ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]
+      : [path.join(home, ".local", "bin"), "/usr/local/bin", "/snap/bin"];
+  const current = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  const known = new Set(current.map((entry) => process.platform === "win32" ? path.resolve(entry).toLowerCase() : path.resolve(entry)));
+  for (const candidate of candidates) {
+    try {
+      if (!(await stat(candidate)).isDirectory()) continue;
+      const normalized = process.platform === "win32" ? path.resolve(candidate).toLowerCase() : path.resolve(candidate);
+      if (!known.has(normalized)) {
+        current.push(candidate);
+        known.add(normalized);
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  process.env.PATH = current.join(path.delimiter);
+}
+
 async function rememberProject(root) {
   const projects = await readRecentProjects();
   await writeRecentProjects([root, ...projects.filter((item) => item !== root)]);
@@ -63,7 +88,7 @@ async function rememberProject(root) {
 
 async function inspectActiveProject() {
   if (!activeProjectRoot) throw new Error("Open a project folder first.");
-  return (await service()).inspectDesktopProject(activeProjectRoot, appRoot);
+  return (await service()).inspectDesktopProject(activeProjectRoot, harnessRoot);
 }
 
 function registerIpc() {
@@ -103,26 +128,26 @@ function registerIpc() {
     assertTrustedSender(event);
     if (!runtimeNames.has(runtime)) throw new Error("Select Codex, Claude Code, or Gemini CLI.");
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
-    return (await service()).initializeDesktopProject(activeProjectRoot, appRoot, runtime);
+    return (await service()).initializeDesktopProject(activeProjectRoot, harnessRoot, runtime);
   });
 
   ipcMain.handle("projects:setRuntime", async (event, runtime) => {
     assertTrustedSender(event);
     if (!runtimeNames.has(runtime)) throw new Error("Select Codex, Claude Code, or Gemini CLI.");
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
-    return (await service()).setDesktopRuntime(activeProjectRoot, appRoot, runtime);
+    return (await service()).setDesktopRuntime(activeProjectRoot, harnessRoot, runtime);
   });
 
   ipcMain.handle("workflows:startIdeaValidation", async (event, input) => {
     assertTrustedSender(event);
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
-    return (await service()).startDesktopIdeaValidation(activeProjectRoot, appRoot, input);
+    return (await service()).startDesktopIdeaValidation(activeProjectRoot, harnessRoot, input);
   });
 
   ipcMain.handle("workflows:startFeatureDelivery", async (event, input) => {
     assertTrustedSender(event);
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
-    return (await service()).startDesktopFeatureDelivery(activeProjectRoot, appRoot, input);
+    return (await service()).startDesktopFeatureDelivery(activeProjectRoot, harnessRoot, input);
   });
 
   ipcMain.handle("reviews:getTask", async (event, taskId) => {
@@ -145,7 +170,7 @@ function registerIpc() {
     if (typeof approvalId !== "string" || !/^APPROVAL-[A-Z0-9-]+$/.test(approvalId)) throw new Error("Invalid approval id.");
     if (decision !== "approve" && decision !== "reject") throw new Error("Choose approve or reject.");
     if (typeof reason !== "string") throw new Error("Enter a decision reason.");
-    return (await service()).decideDesktopApproval(activeProjectRoot, appRoot, approvalId, decision, reason);
+    return (await service()).decideDesktopApproval(activeProjectRoot, harnessRoot, approvalId, decision, reason);
   });
 }
 
@@ -173,7 +198,8 @@ function createWindow() {
   mainWindow.loadFile(rendererFile);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await includeCommonCliPaths();
   registerIpc();
   createWindow();
   app.on("activate", () => {

@@ -1,6 +1,6 @@
 # Founder Desk 데스크탑 앱
 
-Founder Desk는 Agent-Team Harness를 화면에서 시작하고 살펴보는 로컬 데스크탑 앱입니다. 프로젝트마다 Coding Agent CLI 하나를 선택합니다.
+Founder Desk는 Agent-Team Harness를 화면에서 시작하고 살펴보는 로컬 데스크탑 앱입니다. 프로젝트마다 Coding Agent CLI 하나를 선택합니다. 저장소에서 실행할 때는 Node.js 22.13 이상을 사용하세요.
 
 ## 시작하기
 
@@ -10,6 +10,14 @@ Founder Desk는 Agent-Team Harness를 화면에서 시작하고 살펴보는 로
 npm install
 npm run desktop
 ```
+
+Linux용 배포 파일은 다음 명령으로 만듭니다. `out/make`에 `.deb` 설치 파일과 zip 파일이 생성됩니다.
+
+```bash
+npm run make:desktop:linux
+```
+
+Windows와 macOS에서는 각 운영체제에서 `npm run make:desktop`을 실행해 실행 앱을 담은 zip 파일을 만듭니다. Linux 패키징에는 `dpkg`와 `fakeroot`가 필요합니다. 목표 운영체제에서 패키징하세요. `.deb` 메타데이터의 maintainer 주소는 개발용 placeholder입니다. 외부에 배포하기 전에 프로젝트 정보로 변경하세요.
 
 ## 프로젝트 열기
 

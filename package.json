@@ -11,6 +11,9 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "desktop": "npm run build && electron .",
+    "package:desktop": "npm run build && electron-forge package",
+    "make:desktop": "npm run build && electron-forge make",
+    "make:desktop:linux": "npm run build && electron-forge make --platform=linux",
     "test": "tsx --test test/*.test.ts test/**/*.test.ts",
     "test:e2e": "tsx --test test/e2e/**/*.test.ts",
     "test:live": "tsx scripts/live-contract.ts",
@@ -22,6 +25,9 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^8.0.1",
+    "@electron-forge/maker-deb": "^8.0.1",
+    "@electron-forge/maker-zip": "^8.0.1",
     "@types/node": "^24.10.1",
     "electron": "^45.0.0",
     "tsx": "^4.20.6",
