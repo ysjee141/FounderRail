@@ -1,0 +1,17 @@
+version: 1
+generated_from: company/profile.yaml
+status: needs_profile
+active_modules:
+  - business-foundation
+  - product-discovery
+  - engineering-baseline
+  - secure-development
+  - privacy-data
+  - accessibility
+  - finance-admin
+  - release-support
+active_overlays:
+  - jurisdiction/kr
+conditional_modules: []
+sources: []
+last_verified_at: null

@@ -3,8 +3,11 @@ import path from "node:path";
 import process from "node:process";
 import { compileAgentPrompt } from "./agents/prompt.js";
 import { AgentRegistry, isAgentId } from "./agents/registry.js";
-import { initializeConfig, isRuntimeName, loadConfig, stateDirectory } from "./config.js";
+import { initializeConfig, isRuntimeName, loadConfig, setSelectedRuntime, stateDirectory } from "./config.js";
+import { loadAgentContext } from "./context/loader.js";
+import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
+import { readBootstrapStatus } from "./knowledge/bootstrap.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
 import type { RuntimeMode } from "./runtime/types.js";
 
@@ -17,8 +20,11 @@ function usage(): void {
   console.log(`Usage:
   team init --runtime <claude|codex|gemini>
   team doctor
+  team runtime show
+  team runtime set <claude|codex|gemini>
   team agents
   team ask <agent-id> <request> [--dry-run]
+  team bootstrap status
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -33,13 +39,28 @@ async function init(root: string, args: string[]): Promise<void> {
   if (!probe.available) throw new Error(`${runtimeValue} is not available: ${probe.error}`);
 
   const config = await initializeConfig(root, runtimeValue);
-  console.log(JSON.stringify({ initialized: true, config, probe }, null, 2));
+  const scaffold = await scaffoldProject(root);
+  console.log(JSON.stringify({ initialized: true, config, probe, scaffold }, null, 2));
 }
 
 async function doctor(): Promise<void> {
   const probes = await Promise.all(getRuntimeAdapters().map((adapter) => adapter.probe()));
   console.log(JSON.stringify({ runtimes: probes }, null, 2));
   if (!probes.some((probe) => probe.available)) process.exitCode = 1;
+}
+
+async function runtime(root: string, args: string[]): Promise<void> {
+  if (args[0] === "show") {
+    console.log(JSON.stringify(await loadConfig(root), null, 2));
+    return;
+  }
+  if (args[0] !== "set" || !args[1] || !isRuntimeName(args[1])) {
+    throw new Error("Usage: team runtime set <claude|codex|gemini>");
+  }
+  const adapter = getRuntimeAdapter(args[1]);
+  const probe = await adapter.probe();
+  if (!probe.available) throw new Error(`${args[1]} is not available: ${probe.error}`);
+  console.log(JSON.stringify({ config: await setSelectedRuntime(root, args[1]), probe }, null, 2));
 }
 
 async function run(root: string, args: string[]): Promise<void> {
@@ -77,7 +98,9 @@ async function ask(root: string, args: string[]): Promise<void> {
   if (!request || request.startsWith("--")) throw new Error("Agent request is required as the second argument");
 
   const registry = await AgentRegistry.load(root);
-  const prompt = compileAgentPrompt(registry.get(agentValue), request);
+  const agent = registry.get(agentValue);
+  const context = await loadAgentContext(root, agent);
+  const prompt = compileAgentPrompt(agent, request, context);
   if (args.includes("--dry-run")) {
     console.log(prompt);
     return;
@@ -96,6 +119,11 @@ async function ask(root: string, args: string[]): Promise<void> {
   process.exitCode = result.exitCode;
 }
 
+async function bootstrapStatus(root: string, args: string[]): Promise<void> {
+  if (args[0] !== "status") throw new Error("Usage: team bootstrap status");
+  console.log(JSON.stringify(await readBootstrapStatus(root), null, 2));
+}
+
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const root = process.cwd();
@@ -105,8 +133,10 @@ async function main(): Promise<void> {
   }
   if (command === "init") await init(root, args);
   else if (command === "doctor") await doctor();
+  else if (command === "runtime") await runtime(root, args);
   else if (command === "agents") await listAgents(root);
   else if (command === "ask") await ask(root, args);
+  else if (command === "bootstrap") await bootstrapStatus(root, args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }
