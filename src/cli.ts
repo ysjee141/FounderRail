@@ -17,6 +17,8 @@ import { resolveExistingProjectFile } from "./security/project-path.js";
 import { TaskStore } from "./store/task-store.js";
 import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
 import { loadWorkflow } from "./workflows/loader.js";
+import { executeWorkflow, resumeWorkflow } from "./workflows/executor.js";
+import { createRuntimeWorkflowRunner } from "./workflows/runtime-runner.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
 import { parseAgentRuntimeResult } from "./runtime/result-contract.js";
 import type { RuntimeMode } from "./runtime/types.js";
@@ -41,6 +43,10 @@ function usage(): void {
   team handoff record --task <task-id> --agent <agent-id> --from <json-file>
   team handoff list <task-id>
   team workflow inspect <workflow-id>
+  team workflow list [--task <task-id>]
+  team workflow show <run-id>
+  team workflow run <workflow-id> --task <task-id> [--timeout-ms 300000]
+  team workflow resume <run-id> [--timeout-ms 300000]
   team inbox
   team approval request --task <task-id> --action <name> --artifact <project-file>
   team approval decide <approval-id> <approve|reject|request_changes> --reason <text>
@@ -217,8 +223,40 @@ async function handoff(root: string, args: string[]): Promise<void> {
 }
 
 async function workflow(root: string, args: string[]): Promise<void> {
-  if (args[0] !== "inspect" || !args[1]) throw new Error("Usage: team workflow inspect <workflow-id>");
-  console.log(JSON.stringify(await loadWorkflow(root, args[1]), null, 2));
+  if (args[0] === "inspect" && args[1]) {
+    console.log(JSON.stringify(await loadWorkflow(root, args[1]), null, 2));
+    return;
+  }
+  if (args[0] === "list") {
+    const runs = await withTaskStore(root, (store) => store.listWorkflowRuns(valueAfter(args, "--task")));
+    console.log(JSON.stringify({ runs }, null, 2));
+    return;
+  }
+  if (args[0] === "show" && args[1]) {
+    console.log(JSON.stringify(await withTaskStore(root, (store) => store.getWorkflowRun(args[1] as string)), null, 2));
+    return;
+  }
+  const timeoutMs = Number(valueAfter(args, "--timeout-ms") ?? "300000");
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000) throw new Error("--timeout-ms must be at least 1000");
+  if (args[0] === "run" && args[1]) {
+    const taskId = valueAfter(args, "--task");
+    if (!taskId) throw new Error("--task is required");
+    const definition = await loadWorkflow(root, args[1]);
+    const runner = await createRuntimeWorkflowRunner(root, timeoutMs);
+    const result = await withTaskStore(root, (store) => executeWorkflow(definition, store, taskId, runner));
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (args[0] === "resume" && args[1]) {
+    const runId = args[1];
+    const run = await withTaskStore(root, (store) => store.getWorkflowRun(runId));
+    const definition = await loadWorkflow(root, run.workflow_id);
+    const runner = await createRuntimeWorkflowRunner(root, timeoutMs);
+    const result = await withTaskStore(root, (store) => resumeWorkflow(definition, store, runId, runner));
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  throw new Error("Usage: team workflow <inspect|list|show|run|resume> ...");
 }
 
 async function inbox(root: string): Promise<void> {

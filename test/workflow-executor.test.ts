@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { TaskStore } from "../src/store/task-store.js";
-import { executeWorkflow } from "../src/workflows/executor.js";
+import { executeWorkflow, resumeWorkflow } from "../src/workflows/executor.js";
 import { loadWorkflow, validateWorkflow } from "../src/workflows/loader.js";
 
 async function createReadyTask(t: import("node:test").TestContext) {
@@ -128,4 +128,62 @@ test("stops the workflow and blocks the task when an agent needs input", async (
   assert.equal(result.status, "blocked");
   assert.equal(calls, 1);
   assert.equal(store.getTask(task.id).status, "blocked");
+});
+
+test("persists a failed run and resumes without rerunning completed steps", async (t) => {
+  const { store, task } = await createReadyTask(t);
+  const workflow = validateWorkflow({
+    id: "resumable",
+    name: "Resumable",
+    description: "Persistent resume test",
+    steps: [
+      { id: "first", agent: "product-growth", prompt: "first", requires: [], when: "always", retry: 0 },
+      { id: "second", agent: "finance-ops", prompt: "second", requires: ["first"], when: "always", retry: 0 },
+      { id: "third", agent: "founder-office", prompt: "third", requires: ["second"], when: "always", retry: 0 },
+    ],
+  });
+  const firstCalls: string[] = [];
+  const failed = await executeWorkflow(workflow, store, task.id, async ({ step }) => {
+    firstCalls.push(step.id);
+    if (step.id === "second") throw new Error("temporary runtime failure");
+    return validResult(step.id);
+  });
+
+  assert.equal(failed.status, "failed");
+  assert.deepEqual(firstCalls, ["first", "second"]);
+  assert.equal(store.getWorkflowRun(failed.runId).steps[0]?.status, "completed");
+
+  const resumedCalls: string[] = [];
+  const resumed = await resumeWorkflow(workflow, store, failed.runId, async ({ step, priorHandoffs }) => {
+    resumedCalls.push(step.id);
+    if (step.id === "second") assert.equal(priorHandoffs.length, 1);
+    return validResult(step.id);
+  });
+
+  assert.equal(resumed.status, "completed");
+  assert.deepEqual(resumedCalls, ["second", "third"]);
+  assert.equal(resumed.runId, failed.runId);
+  assert.equal(store.listHandoffs(task.id).length, 3);
+  assert.equal(store.getTask(task.id).status, "in_review");
+});
+
+test("refuses resume when the workflow definition changed", async (t) => {
+  const { store, task } = await createReadyTask(t);
+  const workflow = validateWorkflow({
+    id: "digest-bound",
+    name: "Digest bound",
+    description: "Original definition",
+    steps: [{ id: "only", agent: "engineering", prompt: "original", requires: [], when: "always", retry: 0 }],
+  });
+  const failed = await executeWorkflow(workflow, store, task.id, async () => {
+    throw new Error("stop");
+  });
+  const changed = validateWorkflow({
+    ...workflow,
+    steps: [{ ...workflow.steps[0], prompt: "changed after start" }],
+  });
+  await assert.rejects(
+    () => resumeWorkflow(changed, store, failed.runId, async () => validResult("unexpected")),
+    /changed after run/,
+  );
 });
