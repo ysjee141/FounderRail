@@ -8,6 +8,9 @@ import { loadAgentContext } from "./context/loader.js";
 import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
+import { approvalDecisionSchema } from "./approvals/contracts.js";
+import { decideApproval, requestApproval } from "./approvals/service.js";
+import { resolveExistingProjectFile } from "./security/project-path.js";
 import { TaskStore } from "./store/task-store.js";
 import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
 import { loadWorkflow } from "./workflows/loader.js";
@@ -34,6 +37,9 @@ function usage(): void {
   team handoff record --task <task-id> --agent <agent-id> --from <json-file>
   team handoff list <task-id>
   team workflow inspect <workflow-id>
+  team inbox
+  team approval request --task <task-id> --action <name> --artifact <project-file>
+  team approval decide <approval-id> <approve|reject|request_changes> --reason <text>
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -133,10 +139,10 @@ async function bootstrapStatus(root: string, args: string[]): Promise<void> {
   console.log(JSON.stringify(await readBootstrapStatus(root), null, 2));
 }
 
-async function withTaskStore<T>(root: string, operation: (store: TaskStore) => T): Promise<T> {
+async function withTaskStore<T>(root: string, operation: (store: TaskStore) => T | Promise<T>): Promise<T> {
   const store = await TaskStore.open(path.join(stateDirectory(root), "state.db"));
   try {
-    return operation(store);
+    return await operation(store);
   } finally {
     store.close();
   }
@@ -184,13 +190,8 @@ async function handoff(root: string, args: string[]): Promise<void> {
     if (!taskId || !agentId || !isAgentId(agentId) || !source) {
       throw new Error("Usage: team handoff record --task <task-id> --agent <agent-id> --from <json-file>");
     }
-    const { readFile, realpath } = await import("node:fs/promises");
-    const rootReal = await realpath(root);
-    const sourceReal = await realpath(path.resolve(root, source));
-    const relativeSource = path.relative(rootReal, sourceReal);
-    if (relativeSource.startsWith("..") || path.isAbsolute(relativeSource)) {
-      throw new Error("Handoff source must be inside the project");
-    }
+    const { readFile } = await import("node:fs/promises");
+    const sourceReal = await resolveExistingProjectFile(root, source);
     const result = agentResultSchema.parse(JSON.parse(await readFile(sourceReal, "utf8")));
     console.log(JSON.stringify(await withTaskStore(root, (store) => store.recordHandoff(taskId, agentId, result)), null, 2));
     return;
@@ -205,6 +206,31 @@ async function handoff(root: string, args: string[]): Promise<void> {
 async function workflow(root: string, args: string[]): Promise<void> {
   if (args[0] !== "inspect" || !args[1]) throw new Error("Usage: team workflow inspect <workflow-id>");
   console.log(JSON.stringify(await loadWorkflow(root, args[1]), null, 2));
+}
+
+async function inbox(root: string): Promise<void> {
+  console.log(JSON.stringify({ approvals: await withTaskStore(root, (store) => store.listPendingApprovals()) }, null, 2));
+}
+
+async function approval(root: string, args: string[]): Promise<void> {
+  if (args[0] === "request") {
+    const taskId = valueAfter(args, "--task");
+    const action = valueAfter(args, "--action");
+    const artifact = valueAfter(args, "--artifact");
+    if (!taskId || !action || !artifact) throw new Error("Usage: team approval request --task <task-id> --action <name> --artifact <project-file>");
+    const created = await withTaskStore(root, (store) => requestApproval(root, store, taskId, action, artifact));
+    console.log(JSON.stringify(created, null, 2));
+    return;
+  }
+  if (args[0] === "decide" && args[1] && args[2]) {
+    const decision = approvalDecisionSchema.parse(args[2]);
+    const reason = valueAfter(args, "--reason");
+    if (!reason) throw new Error("--reason is required");
+    const updated = await withTaskStore(root, (store) => decideApproval(root, store, args[1] as string, decision, reason));
+    console.log(JSON.stringify(updated, null, 2));
+    return;
+  }
+  throw new Error("Usage: team approval <request|decide> ...");
 }
 
 async function main(): Promise<void> {
@@ -223,6 +249,8 @@ async function main(): Promise<void> {
   else if (command === "task") await task(root, args);
   else if (command === "handoff") await handoff(root, args);
   else if (command === "workflow") await workflow(root, args);
+  else if (command === "inbox") await inbox(root);
+  else if (command === "approval") await approval(root, args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }
