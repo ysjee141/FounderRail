@@ -1,0 +1,28 @@
+id: feature-delivery
+name: Feature Delivery
+description: 승인된 제품 범위를 구현하고 위험에 비례한 검토 자료를 준비한다.
+steps:
+  - id: product-spec
+    agent: product-growth
+    prompt: 대상 고객, 문제, 범위, 수용 조건과 성공 지표를 명확히 한다.
+    requires: []
+    when: always
+    retry: 1
+  - id: engineering-change
+    agent: engineering
+    prompt: 별도 worktree에서 최소 변경을 구현하고 검사 evidence와 rollback 계획을 남긴다.
+    requires: [product-spec]
+    when: always
+    retry: 1
+  - id: risk-review
+    agent: risk-quality
+    prompt: 명시된 risk flag에 해당하는 변경만 검토하고 finding과 남은 위험을 기록한다.
+    requires: [engineering-change]
+    when: risk_flags_present
+    retry: 1
+  - id: scope-review
+    agent: founder-office
+    prompt: 변경이 승인된 목표와 범위를 충족하는지 확인하고 release 결정 항목을 정리한다.
+    requires: [engineering-change, risk-review]
+    when: always
+    retry: 1

@@ -19,6 +19,8 @@ team task create --owner product-growth --objective "고객 문제를 검증한�
 team workflow inspect idea-validation
 team inbox
 team worktree create TASK-EXAMPLE
+team risk classify src/auth/session.ts infra/terraform/main.tf
+team finance runway --cash 12000000 --revenue 1000000 --expenses 3000000
 team run --prompt "현재 저장소의 상태를 한 문단으로 요약해줘"
 ```
 

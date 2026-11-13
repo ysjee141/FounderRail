@@ -9,6 +9,8 @@ import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
 import { collectWorktreeEvidence, createEngineeringWorktree } from "./engineering/worktree.js";
+import { calculateRunway } from "./finance/runway.js";
+import { deriveRiskFlags } from "./risk/router.js";
 import { approvalDecisionSchema } from "./approvals/contracts.js";
 import { decideApproval, requestApproval } from "./approvals/service.js";
 import { resolveExistingProjectFile } from "./security/project-path.js";
@@ -43,6 +45,8 @@ function usage(): void {
   team approval decide <approval-id> <approve|reject|request_changes> --reason <text>
   team worktree create <task-id> [--base <git-ref>]
   team worktree inspect <task-id> --base-commit <sha>
+  team risk classify <path-or-label>...
+  team finance runway --cash <number> --revenue <number> --expenses <number>
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -258,6 +262,19 @@ async function worktree(root: string, args: string[]): Promise<void> {
   throw new Error("Usage: team worktree <create|inspect> ...");
 }
 
+function risk(args: string[]): void {
+  if (args[0] !== "classify" || args.length < 2) throw new Error("Usage: team risk classify <path-or-label>...");
+  console.log(JSON.stringify({ risk_flags: deriveRiskFlags(args.slice(1)) }, null, 2));
+}
+
+function finance(args: string[]): void {
+  if (args[0] !== "runway") throw new Error("Usage: team finance runway --cash <number> --revenue <number> --expenses <number>");
+  const availableCash = Number(valueAfter(args, "--cash"));
+  const monthlyRevenue = Number(valueAfter(args, "--revenue"));
+  const monthlyExpenses = Number(valueAfter(args, "--expenses"));
+  console.log(JSON.stringify(calculateRunway({ availableCash, monthlyRevenue, monthlyExpenses }), null, 2));
+}
+
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const root = process.cwd();
@@ -277,6 +294,8 @@ async function main(): Promise<void> {
   else if (command === "inbox") await inbox(root);
   else if (command === "approval") await approval(root, args);
   else if (command === "worktree") await worktree(root, args);
+  else if (command === "risk") risk(args);
+  else if (command === "finance") finance(args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }
