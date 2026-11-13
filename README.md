@@ -37,3 +37,8 @@ Workflow는 `workflows/*.yaml`에 정의합니다. loader는 dependency와 cycle
 Engineering 변경은 `.agent-team/worktrees/<task-id>`의 전용 branch에서 수행합니다. Harness는 worktree와 diff evidence를 만들지만 merge, production 배포, worktree 삭제는 자동 실행하지 않습니다.
 
 전체 설계와 단계별 구현 계획은 [agent-team-harness-plan.md](./agent-team-harness-plan.md)를 참고합니다.
+
+- [시작 안내](./docs/getting-started.md)
+- [운영 안내](./docs/operations.md)
+- [복구 안내](./docs/recovery.md)
+- [구현 현황과 남은 단계](./docs/implementation-status.md)

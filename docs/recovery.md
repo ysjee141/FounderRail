@@ -1,0 +1,21 @@
+# Recovery
+
+## 보존 대상
+
+- Git 저장소와 모든 추적 문서
+- `.agent-team/state.db`
+- `.agent-team/events/*.jsonl`
+- `company/`, `knowledge/`, `work/`
+
+`.agent-team/`은 기본적으로 Git에서 제외되므로 별도의 암호화된 backup이 필요하다. credential과 원본 결제·개인정보 자료는 이 디렉터리에 넣지 않는다.
+
+## 복구 순서
+
+1. 저장소를 검증된 commit으로 복구한다.
+2. 동일 Node.js major와 의존성을 설치한다.
+3. `state.db`와 JSONL event를 원래 경로에 복원한다.
+4. `npm run check && npm test && npm run build`를 실행한다.
+5. `team doctor`, `team runtime show`, `team bootstrap status`, `team inbox`를 확인한다.
+6. `git worktree list`로 남은 Engineering worktree와 branch를 대조한다.
+
+SQLite backup은 실행 중인 DB 파일을 단순 복사하지 말고 SQLite backup 방식이나 중지된 상태의 일관된 snapshot을 사용한다. 복원본은 별도 디렉터리에서 먼저 검사한다.

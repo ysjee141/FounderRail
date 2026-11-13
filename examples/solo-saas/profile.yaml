@@ -1,0 +1,27 @@
+version: 1
+business:
+  home_jurisdiction: KR
+  entity_status: pre_business
+  target_markets: [KR]
+  customer_type: B2B
+  revenue_model: [subscription]
+product:
+  form: web_saas
+  distribution: [web]
+  stage: idea
+  has_ai_features: true
+  allows_user_content: false
+data:
+  categories: [account, usage, payment_metadata, ai_input]
+  sensitive_categories: []
+  minors_possible: false
+  storage_regions: [KR]
+technology:
+  cloud: undecided
+  auth: managed
+  payment_provider: undecided
+  analytics: undecided
+operations:
+  availability_target: best_effort
+  recovery_target: 24h
+  support_channel: email
