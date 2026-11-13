@@ -2,7 +2,22 @@
 
 ## 주간 운영
 
-`weekly-operations` workflow는 Product, Engineering, Finance, Risk의 변경을 Founder Office가 한 페이지로 통합하도록 정의한다. 현재 CLI는 workflow 검사까지 제공하며, 실 Runtime을 이용한 `team weekly` 실행 명령은 아직 구현 대상이다.
+`weekly-operations` workflow는 Product, Engineering, Finance, Risk의 변경을 Founder Office가 한 페이지로 통합하도록 정의한다. 예약 실행은 아직 구현 대상이지만 CLI에서 선택한 Runtime으로 workflow를 직접 실행할 수 있다.
+
+```bash
+team task transition <task-id> ready
+team workflow run weekly-operations --task <task-id>
+team workflow list --task <task-id>
+```
+
+각 step의 상태와 시도 횟수, Handoff ID는 `.agent-team/state.db`에 기록된다. 실패하거나 프로세스가 중단된 경우 run을 조회하고 재개한다.
+
+```bash
+team workflow show <run-id>
+team workflow resume <run-id>
+```
+
+재개 시 `completed`와 `skipped` step은 다시 실행하지 않는다. 시작 당시 workflow SHA-256과 현재 YAML 정의가 다르면 재개를 거부하므로, 정의를 되돌리거나 새 Task/run을 만든다.
 
 ## Task와 Handoff
 

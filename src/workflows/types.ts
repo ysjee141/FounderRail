@@ -32,9 +32,10 @@ export interface WorkflowStepResult {
 }
 
 export interface WorkflowExecutionResult {
+  runId: string;
   workflowId: string;
   taskId: string;
-  status: "completed" | "blocked" | "failed";
+  status: "running" | "completed" | "blocked" | "failed";
   steps: WorkflowStepResult[];
 }
 

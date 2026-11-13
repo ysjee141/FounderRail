@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { TaskStore, TaskNotFoundError } from "../src/store/task-store.js";
 import { InvalidTaskTransitionError } from "../src/tasks/state-machine.js";
+import { validateWorkflow } from "../src/workflows/loader.js";
 
 async function openTemporaryStore(t: Parameters<typeof test>[1] extends (arg: infer T) => unknown ? T : never) {
   const root = await mkdtemp(path.join(os.tmpdir(), "agent-team-state-"));
@@ -52,4 +53,27 @@ test("records validated immutable handoffs for an existing task", async (t) => {
   const handoff = store.recordHandoff(task.id, "engineering", result);
   assert.deepEqual(store.listHandoffs(task.id), [handoff]);
   assert.throws(() => store.recordHandoff("TASK-MISSING", "engineering", result), TaskNotFoundError);
+});
+
+test("workflow run state survives closing and reopening SQLite", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "agent-team-run-state-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const databasePath = path.join(root, "state.db");
+  const first = await TaskStore.open(databasePath);
+  const task = first.createTask(taskInput);
+  first.transitionTask(task.id, "ready");
+  const workflow = validateWorkflow({
+    id: "persisted",
+    name: "Persisted",
+    description: "Persistence check",
+    steps: [{ id: "one", agent: "engineering", prompt: "check", requires: [], when: "always", retry: 0 }],
+  });
+  const run = first.startWorkflowRun(workflow, task.id);
+  first.startWorkflowStep(run.id, "one");
+  first.close();
+
+  const reopened = await TaskStore.open(databasePath);
+  t.after(() => reopened.close());
+  assert.equal(reopened.getWorkflowRun(run.id).steps[0]?.status, "running");
+  assert.deepEqual(reopened.listWorkflowRuns(task.id).map((item) => item.id), [run.id]);
 });
