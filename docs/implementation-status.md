@@ -20,10 +20,14 @@
 | 14 | Knowledge source manifest, snapshot hash, Card compiler, freshness·coverage qualification gate |
 | 15 | timezone-aware weekly·monthly slot, idempotent SQLite firing, 검토 가능한 draft Task 생성 |
 | 16 | Claude·Codex live contract, Gemini availability report, user-config 격리, timeout·cancel process-tree 종료 |
+| 17 | 임시 SaaS fixture에서 Codex idea-validation 3-step 실제 workflow·SQLite Handoff smoke 통과 |
 
-## 다음 구현
+## 외부 환경에서 남은 검증
 
 1. Gemini CLI 설치 환경에서 live contract 통과
-2. sample SaaS 실제 workflow smoke test와 외부 서비스 sandbox fixture
+2. 실제 제품 저장소에서 feature-delivery worktree·approval tabletop
+3. 결제·메일·배포 등 외부 서비스는 각 provider sandbox fixture로 별도 검증
+
+현재 로컬 MVP는 계획의 핵심인 Runtime 교체, 5개 최소 Agent, 전문 지식 gate, 영속 workflow·재개, Human Approval, 격리 Engineering, 정기 draft Task를 구현했다. 외부 서비스 쓰기와 production 배포는 의도적으로 자동화하지 않았다.
 
 현재 상태는 안전 경계, Fake Runtime E2E, 실제 Runtime 결과 계약이 있는 구현 기반이다. 아직 실제 Coding Agent로 전체 workflow를 자동 실행하는 완성 MVP는 아니다.
