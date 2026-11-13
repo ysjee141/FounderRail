@@ -18,6 +18,7 @@ import { TaskStore } from "./store/task-store.js";
 import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
 import { loadWorkflow } from "./workflows/loader.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
+import { parseAgentRuntimeResult } from "./runtime/result-contract.js";
 import type { RuntimeMode } from "./runtime/types.js";
 
 function valueAfter(args: string[], flag: string): string | undefined {
@@ -133,12 +134,17 @@ async function ask(root: string, args: string[]): Promise<void> {
   const adapter = getRuntimeAdapter(config.runtime);
   const store = new JsonlEventStore(path.join(stateDirectory(root), "events"));
   const result = await adapter.run(
-    { prompt, cwd: root, mode: "read-only", timeoutMs: 300_000 },
+    {
+      prompt,
+      cwd: root,
+      mode: "read-only",
+      timeoutMs: 300_000,
+      outputSchema: { schema: agent.outputSchema, path: path.resolve(root, agent.outputs.schema) },
+    },
     (event) => store.append(event),
   );
-  console.log(result.stdout.trim());
+  console.log(JSON.stringify(parseAgentRuntimeResult(result), null, 2));
   if (result.stderr.trim()) console.error(result.stderr.trim());
-  process.exitCode = result.exitCode;
 }
 
 async function bootstrapStatus(root: string, args: string[]): Promise<void> {

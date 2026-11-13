@@ -51,12 +51,12 @@ export const agentResultSchema = z.object({
   status: z.enum(["completed", "needs_input", "blocked", "ready_for_review"]),
   summary: z.string().min(1),
   artifacts: z.array(z.string()),
-  evidence: z.array(z.object({ claim: z.string(), source: z.string() })),
+  evidence: z.array(z.object({ claim: z.string(), source: z.string() }).strict()),
   decisions: z.array(z.string()),
   assumptions: z.array(z.string()),
   risks: z.array(z.string()),
   requested_next_agent: z.enum(AGENT_IDS).nullable(),
-});
+}).strict();
 export type AgentResult = z.infer<typeof agentResultSchema>;
 
 export const handoffContractSchema = agentResultSchema.extend({

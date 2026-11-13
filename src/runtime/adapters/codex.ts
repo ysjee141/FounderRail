@@ -6,15 +6,19 @@ export class CodexRuntimeAdapter extends BaseRuntimeAdapter {
   readonly command = "codex";
 
   buildInvocation(request: RuntimeRunRequest): RuntimeInvocation {
+    const structuredOutputArgs = request.outputSchema
+      ? ["--output-schema", request.outputSchema.path]
+      : [];
     return {
       command: this.command,
       args: [
+        "--ask-for-approval",
+        "never",
         "exec",
         "--json",
         "--sandbox",
         request.mode,
-        "--ask-for-approval",
-        "never",
+        ...structuredOutputArgs,
         "-",
       ],
       stdin: request.prompt,

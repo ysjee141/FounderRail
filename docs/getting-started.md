@@ -39,8 +39,9 @@ team bootstrap status
 ```bash
 team agents
 team ask product-growth "현재 제품 가설에서 확인할 질문을 정리해줘" --dry-run
+team ask product-growth "현재 제품 가설에서 확인할 질문을 정리해줘"
 team workflow inspect idea-validation
 team inbox
 ```
 
-현재 `team ask`는 읽기 전용이다. Agent가 생성한 문서 변경은 scoped writer와 workflow를 통해 연결해야 한다.
+현재 `team ask`는 읽기 전용이다. 정상 실행 결과는 Runtime별 stream을 그대로 노출하지 않고 공통 Agent Result JSON으로 반환한다. schema에 맞지 않는 응답은 실패한다. Agent가 생성한 문서 변경은 scoped writer와 workflow를 통해 연결해야 한다.

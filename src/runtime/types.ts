@@ -22,6 +22,10 @@ export interface RuntimeRunRequest {
   cwd: string;
   mode: RuntimeMode;
   timeoutMs: number;
+  outputSchema?: {
+    schema: Record<string, unknown>;
+    path: string;
+  };
 }
 
 export interface RuntimeEvent {
