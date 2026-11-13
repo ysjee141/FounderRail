@@ -15,6 +15,8 @@ export class CodexRuntimeAdapter extends BaseRuntimeAdapter {
         "--ask-for-approval",
         "never",
         "exec",
+        "--ignore-user-config",
+        "--ephemeral",
         "--json",
         "--sandbox",
         request.mode,

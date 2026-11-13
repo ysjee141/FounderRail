@@ -16,6 +16,13 @@ npm run build
 npm link
 ```
 
+기본 테스트는 모델을 호출하지 않는다. 실제 선택 Runtime의 인증·CLI 프로토콜까지 확인하려면 비용과 사용량이 발생하는 live contract를 명시적으로 실행한다.
+
+```bash
+npm run test:live -- --runtime codex
+npm run test:live -- --runtime all --require-all
+```
+
 ## 프로젝트 초기화
 
 제품 저장소의 루트에서 실행한다.

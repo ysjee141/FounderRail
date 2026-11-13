@@ -11,6 +11,7 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/*.test.ts test/**/*.test.ts",
     "test:e2e": "tsx --test test/e2e/**/*.test.ts",
+    "test:live": "tsx scripts/live-contract.ts",
     "team": "tsx src/cli.ts"
   },
   "dependencies": {
