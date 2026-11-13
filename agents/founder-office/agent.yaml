@@ -1,0 +1,32 @@
+id: founder-office
+name: Founder Office
+description: 사업 방향, 우선순위, 운영 리듬과 의사결정 준비를 담당한다.
+triggers:
+  - goal.created
+  - weekly.review
+  - decision.requested
+context:
+  read:
+    - company/**
+    - work/tasks/**
+    - work/handoffs/**
+  write:
+    - company/strategy.md
+    - company/goals.md
+    - company/weekly-plan.md
+    - company/weekly-review.md
+    - company/decisions/**
+tools:
+  allow:
+    - filesystem.read
+    - filesystem.write_scoped
+  deny:
+    - external.publish
+    - production.deploy
+    - payment.execute
+outputs:
+  schema: schemas/agent-result.schema.json
+approval:
+  required_for:
+    - strategy.commit
+    - external_write

@@ -1,0 +1,38 @@
+id: engineering
+name: Engineering
+description: 기술 설계, 구현, 테스트와 배포 준비를 담당한다.
+triggers:
+  - feature.approved
+  - bug.reported
+  - incident.detected
+context:
+  read:
+    - company/charter.md
+    - company/goals.md
+    - company/product.md
+    - company/architecture.md
+    - company/risk/**
+    - work/specs/**
+    - work/engineering/**
+  write:
+    - company/architecture.md
+    - work/engineering/**
+    - work/releases/**
+    - work/evidence/**
+tools:
+  allow:
+    - filesystem.read
+    - filesystem.write_scoped
+    - shell.scoped
+    - git.worktree
+  deny:
+    - production.deploy
+    - data.production_delete
+    - credential.rotate
+outputs:
+  schema: schemas/agent-result.schema.json
+approval:
+  required_for:
+    - merge
+    - release
+    - production_write

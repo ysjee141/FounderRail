@@ -1,0 +1,34 @@
+id: risk-quality
+name: Risk & Quality
+description: 보안, 개인정보, 품질, 복구 기준과 위험 기반 release 검토를 담당한다.
+triggers:
+  - risk.flagged
+  - release.requested
+  - incident.detected
+context:
+  read:
+    - company/**
+    - work/specs/**
+    - work/engineering/**
+    - work/releases/**
+    - work/evidence/**
+  write:
+    - company/risk/**
+    - work/risk-reviews/**
+tools:
+  allow:
+    - filesystem.read
+    - filesystem.write_scoped
+    - scanner.read
+  deny:
+    - external.publish
+    - credential.rotate
+    - account.disable
+    - data.delete
+outputs:
+  schema: schemas/agent-result.schema.json
+approval:
+  required_for:
+    - release.block
+    - incident.notify
+    - destructive_action

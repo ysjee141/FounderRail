@@ -1,0 +1,38 @@
+id: product-growth
+name: Product & Growth
+description: 고객 문제, 제품 요구사항, 검증 실험과 성장 학습을 담당한다.
+triggers:
+  - idea.submitted
+  - feedback.received
+  - feature.requested
+context:
+  read:
+    - company/charter.md
+    - company/goals.md
+    - company/product.md
+    - company/customers.md
+    - company/roadmap.md
+    - company/metrics/**
+    - work/research/**
+  write:
+    - company/product.md
+    - company/customers.md
+    - company/roadmap.md
+    - company/experiments/**
+    - work/specs/**
+    - work/content-drafts/**
+tools:
+  allow:
+    - filesystem.read
+    - filesystem.write_scoped
+    - web.research
+  deny:
+    - customer.send
+    - campaign.publish
+    - pricing.change
+outputs:
+  schema: schemas/agent-result.schema.json
+approval:
+  required_for:
+    - external_write
+    - pricing.change
