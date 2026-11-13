@@ -1,4 +1,4 @@
-# Solo Founder Agent Team
+# [WIP] Solo Founder Agent Team
 
 Claude Code, Codex 또는 Gemini CLI 중 하나를 선택해 동일한 1인 창업 Agent-Team을 실행하는 로컬 Harness입니다.
 
