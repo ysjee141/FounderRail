@@ -19,8 +19,11 @@ function assertTrustedSender(event) {
 
 function service() {
   if (!desktopServices) {
-    const serviceUrl = pathToFileURL(path.join(appRoot, "dist", "desktop", "application.js"));
-    desktopServices = import(serviceUrl.href);
+    const desktopRoot = path.join(appRoot, "dist", "desktop");
+    const applicationUrl = pathToFileURL(path.join(desktopRoot, "application.js"));
+    const workflowUrl = pathToFileURL(path.join(desktopRoot, "workflow-application.js"));
+    desktopServices = Promise.all([import(applicationUrl.href), import(workflowUrl.href)])
+      .then(([application, workflows]) => ({ ...application, ...workflows }));
   }
   return desktopServices;
 }
