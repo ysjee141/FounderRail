@@ -229,7 +229,7 @@ export class TaskStore {
     return rows.map((row) => workflowRunSchema.parse(JSON.parse(row.document)));
   }
 
-  resumeWorkflowRun(id: string, workflow: WorkflowDefinition): WorkflowRun {
+  resumeWorkflowRun(id: string, workflow: WorkflowDefinition, additionalInput?: string): WorkflowRun {
     const current = this.getWorkflowRun(id);
     if (current.workflow_id !== workflow.id) {
       throw new Error(`Workflow run ${id} belongs to ${current.workflow_id}, not ${workflow.id}`);
@@ -245,6 +245,13 @@ export class TaskStore {
     `).get(current.task_id, id) as { id: string } | undefined;
     if (competing) throw new Error(`Task ${current.task_id} has another active workflow run: ${competing.id}`);
     const task = this.getTask(current.task_id);
+    const normalizedAdditionalInput = additionalInput?.trim();
+    if (normalizedAdditionalInput && !["blocked", "failed"].includes(task.status)) {
+      throw new Error(`Task ${task.id} cannot accept additional input from ${task.status}`);
+    }
+    if (normalizedAdditionalInput && normalizedAdditionalInput.length > 3000) {
+      throw new Error("Additional workflow input must be 3000 characters or less.");
+    }
     this.db.exec("BEGIN IMMEDIATE");
     try {
       if (task.status === "blocked") this.transitionTask(task.id, "running");
@@ -254,6 +261,7 @@ export class TaskStore {
       } else if (task.status !== "running") {
         throw new Error(`Task ${task.id} cannot resume from ${task.status}`);
       }
+      if (normalizedAdditionalInput) this.appendTaskInput(task.id, normalizedAdditionalInput);
       const resumed = workflowRunSchema.parse({
         ...current,
         status: "running",
@@ -269,6 +277,19 @@ export class TaskStore {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  private appendTaskInput(id: string, input: string): void {
+    const current = this.getTask(id);
+    const updated = taskContractSchema.parse({
+      ...current,
+      inputs: [...current.inputs, `창업자 보완 정보: ${input}`],
+      updated_at: new Date().toISOString(),
+    });
+    const result = this.db.prepare(`
+      UPDATE tasks SET document = ?, updated_at = ? WHERE id = ? AND status = ? AND document = ?
+    `).run(JSON.stringify(updated), updated.updated_at, id, current.status, JSON.stringify(current));
+    if (result.changes !== 1) throw new Error(`Concurrent task update detected: ${id}`);
   }
 
   startWorkflowStep(runId: string, stepId: string): WorkflowRun {
