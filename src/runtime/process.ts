@@ -46,6 +46,19 @@ function parseJsonLine(line: string): unknown {
   }
 }
 
+function killProcessTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  if (!child.pid) return;
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+    }
+  }
+  child.kill(signal);
+}
+
 export async function runInvocation(
   runtime: RuntimeName,
   invocation: RuntimeInvocation,
@@ -84,12 +97,15 @@ export async function runInvocation(
       cwd: request.cwd,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
     let stdout = "";
     let stderr = "";
     let stdoutBuffer = "";
     let stderrBuffer = "";
     let settled = false;
+    let stopReason: "timed_out" | "aborted" | undefined;
+    let forceKillTimer: NodeJS.Timeout | undefined;
 
     const consume = (stream: "stdout" | "stderr", chunk: string): void => {
       if (stream === "stdout") {
@@ -116,16 +132,29 @@ export async function runInvocation(
     child.stdout.on("data", (chunk: string) => consume("stdout", chunk));
     child.stderr.on("data", (chunk: string) => consume("stderr", chunk));
 
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 2_000).unref();
-    }, request.timeoutMs);
+    const stop = (reason: "timed_out" | "aborted"): void => {
+      if (settled || stopReason) return;
+      stopReason = reason;
+      killProcessTree(child, "SIGTERM");
+      forceKillTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), 2_000);
+      forceKillTimer.unref();
+    };
+    const timer = setTimeout(() => stop("timed_out"), request.timeoutMs);
     timer.unref();
+    const abort = (): void => stop("aborted");
+    request.signal?.addEventListener("abort", abort, { once: true });
+    if (request.signal?.aborted) abort();
+
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      request.signal?.removeEventListener("abort", abort);
+    };
 
     child.on("error", async (error) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       await eventChain;
       await emit("run.failed", { error: error.message });
       reject(error);
@@ -134,13 +163,15 @@ export async function runInvocation(
     child.on("close", async (exitCode, signal) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (stopReason) killProcessTree(child, "SIGKILL");
+      cleanup();
       await eventChain;
       if (stdoutBuffer) await emit("runtime.stdout", { data: parseJsonLine(stdoutBuffer) });
       if (stderrBuffer) await emit("runtime.stderr", { data: parseJsonLine(stderrBuffer) });
 
-      const code = exitCode ?? (signal ? 128 : 1);
-      await emit(code === 0 ? "run.completed" : "run.failed", { exitCode: code, signal });
+      const code = stopReason === "timed_out" ? 124 : stopReason === "aborted" ? 130 : exitCode ?? (signal ? 128 : 1);
+      const termination = stopReason ?? (code === 0 ? "completed" : "failed");
+      await emit(code === 0 ? "run.completed" : "run.failed", { exitCode: code, signal, termination });
       resolve({
         runId,
         runtime,
@@ -149,6 +180,8 @@ export async function runInvocation(
         stderr,
         startedAt,
         finishedAt: new Date().toISOString(),
+        termination,
+        ...(signal ? { signal } : {}),
       });
     });
 

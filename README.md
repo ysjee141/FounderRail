@@ -25,9 +25,12 @@ team worktree create TASK-EXAMPLE
 team risk classify src/auth/session.ts infra/terraform/main.tf
 team finance runway --cash 12000000 --revenue 1000000 --expenses 3000000
 team run --prompt "현재 저장소의 상태를 한 문단으로 요약해줘"
+npm run test:live -- --runtime codex
 ```
 
 Runtime 실행 이벤트는 `.agent-team/events/<run-id>.jsonl`에 저장됩니다. 기본 실행 모드는 `read-only`이며, 명시적으로 `--mode workspace-write`를 전달해야 파일을 변경할 수 있습니다.
+
+`npm run test:live -- --runtime <claude|codex|gemini|all>`은 설치된 실제 CLI의 structured-output 계약을 한 번 호출해 검증합니다. 기본 테스트에는 모델 호출이 없으며, `--require-all`을 추가할 때만 미설치 Runtime도 실패로 처리합니다.
 
 `team ask`는 Claude·Codex·Gemini의 서로 다른 스트리밍 프로토콜에서 최종 응답을 추출한 뒤 공통 Agent Result schema로 다시 검증합니다. Claude와 Codex에는 각 CLI의 native structured-output 옵션도 전달하며, 잘못된 JSONL·실패 종료·계약 밖 필드는 성공으로 취급하지 않습니다.
 

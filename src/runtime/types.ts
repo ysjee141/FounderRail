@@ -22,6 +22,7 @@ export interface RuntimeRunRequest {
   cwd: string;
   mode: RuntimeMode;
   timeoutMs: number;
+  signal?: AbortSignal;
   outputSchema?: {
     schema: Record<string, unknown>;
     path: string;
@@ -45,6 +46,8 @@ export interface RuntimeResult {
   stderr: string;
   startedAt: string;
   finishedAt: string;
+  termination: "completed" | "timed_out" | "aborted" | "failed";
+  signal?: NodeJS.Signals;
 }
 
 export interface RuntimeAdapter {

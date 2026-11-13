@@ -21,6 +21,10 @@ test("Claude uses non-interactive streaming JSON in plan mode", () => {
     "--output-format",
     "stream-json",
     "--verbose",
+    "--safe-mode",
+    "--no-session-persistence",
+    "--permission-prompts",
+    "none",
     "--permission-mode",
     "plan",
   ]);
@@ -29,7 +33,17 @@ test("Claude uses non-interactive streaming JSON in plan mode", () => {
 test("Codex reads the prompt from stdin and uses a read-only sandbox", () => {
   const invocation = new CodexRuntimeAdapter().buildInvocation(request);
   assert.equal(invocation.stdin, request.prompt);
-  assert.deepEqual(invocation.args, ["--ask-for-approval", "never", "exec", "--json", "--sandbox", "read-only", "-"]);
+  assert.deepEqual(invocation.args, [
+    "--ask-for-approval",
+    "never",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--json",
+    "--sandbox",
+    "read-only",
+    "-",
+  ]);
 });
 
 test("Gemini uses headless streaming JSON in plan mode", () => {

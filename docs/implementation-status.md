@@ -19,10 +19,11 @@
 | 13 | Engineering plan·implement·review 세션, managed worktree 재사용, 쓰기 범위 사후 검증 |
 | 14 | Knowledge source manifest, snapshot hash, Card compiler, freshness·coverage qualification gate |
 | 15 | timezone-aware weekly·monthly slot, idempotent SQLite firing, 검토 가능한 draft Task 생성 |
+| 16 | Claude·Codex live contract, Gemini availability report, user-config 격리, timeout·cancel process-tree 종료 |
 
 ## 다음 구현
 
-1. Claude·Codex·Gemini 실제 contract test; 현재 로컬에는 Gemini CLI가 없음
-2. sample SaaS live smoke test와 timeout·cancel·고아 process 검사 확장
+1. Gemini CLI 설치 환경에서 live contract 통과
+2. sample SaaS 실제 workflow smoke test와 외부 서비스 sandbox fixture
 
 현재 상태는 안전 경계, Fake Runtime E2E, 실제 Runtime 결과 계약이 있는 구현 기반이다. 아직 실제 Coding Agent로 전체 workflow를 자동 실행하는 완성 MVP는 아니다.
