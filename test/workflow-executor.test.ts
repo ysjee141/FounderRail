@@ -187,3 +187,103 @@ test("refuses resume when the workflow definition changed", async (t) => {
     /changed after run/,
   );
 });
+
+test("pauses at an approval step and resumes after an artifact-bound decision", async (t) => {
+  const { store, task } = await createReadyTask(t);
+  const workflow = validateWorkflow({
+    id: "approval-resume",
+    name: "Approval resume",
+    description: "Approval checkpoint test",
+    steps: [
+      { id: "prepare", agent: "engineering", prompt: "prepare", requires: [], when: "always", retry: 0 },
+      {
+        id: "human-check",
+        type: "approval",
+        action: "release",
+        artifact: "work/releases/candidate.md",
+        requires: ["prepare"],
+        when: "always",
+      },
+      { id: "after", agent: "founder-office", prompt: "after", requires: ["human-check"], when: "always", retry: 0 },
+    ],
+  });
+  const calls: string[] = [];
+  let approvalId = "";
+  const waiting = await executeWorkflow(
+    workflow,
+    store,
+    task.id,
+    async ({ step }) => {
+      calls.push(step.id);
+      return validResult(step.id);
+    },
+    async ({ runId, step }) => {
+      const requested = store.requestWorkflowStepApproval(
+        runId,
+        step.id,
+        step.action,
+        step.artifact,
+        "a".repeat(64),
+      );
+      approvalId = requested.approval.id;
+    },
+  );
+
+  assert.equal(waiting.status, "waiting_approval");
+  assert.deepEqual(calls, ["prepare"]);
+  assert.equal(store.getTask(task.id).status, "waiting_approval");
+  store.decideApproval(approvalId, "approve", "evidence checked");
+  assert.equal(store.getTask(task.id).status, "running");
+
+  const resumed = await resumeWorkflow(workflow, store, waiting.runId, async ({ step }) => {
+    calls.push(step.id);
+    return validResult(step.id);
+  });
+  assert.equal(resumed.status, "completed");
+  assert.deepEqual(calls, ["prepare", "after"]);
+  assert.equal(store.getTask(task.id).status, "in_review");
+});
+
+test("requesting approval changes creates a fresh checkpoint on resume", async (t) => {
+  const { store, task } = await createReadyTask(t);
+  const workflow = validateWorkflow({
+    id: "approval-changes",
+    name: "Approval changes",
+    description: "Reapproval test",
+    steps: [{
+      id: "check",
+      type: "approval",
+      action: "release",
+      artifact: "company/release-checklist.md",
+      requires: [],
+      when: "always",
+    }],
+  });
+  const approvals: string[] = [];
+  const request = async ({ runId, step }: Parameters<NonNullable<Parameters<typeof executeWorkflow>[4]>>[0]) => {
+    const created = store.requestWorkflowStepApproval(
+      runId,
+      step.id,
+      step.action,
+      step.artifact,
+      (approvals.length === 0 ? "a" : "b").repeat(64),
+    );
+    approvals.push(created.approval.id);
+  };
+
+  const waiting = await executeWorkflow(workflow, store, task.id, async () => validResult("unused"), request);
+  const firstApproval = approvals[0];
+  assert.ok(firstApproval);
+  store.decideApproval(firstApproval, "request_changes", "update rollback evidence");
+  assert.equal(store.getWorkflowRun(waiting.runId).status, "blocked");
+
+  const waitingAgain = await resumeWorkflow(workflow, store, waiting.runId, async () => validResult("unused"), request);
+  assert.equal(waitingAgain.status, "waiting_approval");
+  assert.equal(approvals.length, 2);
+  assert.notEqual(approvals[0], approvals[1]);
+  const secondApproval = approvals[1];
+  assert.ok(secondApproval);
+  store.decideApproval(secondApproval, "approve", "updated evidence checked");
+  assert.equal(store.getWorkflowRun(waiting.runId).status, "completed");
+  assert.equal(store.getTask(task.id).status, "completed");
+});

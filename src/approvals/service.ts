@@ -28,6 +28,24 @@ export async function requestApproval(
   return store.requestApproval(taskId, action, artifact.relativePath, artifact.sha256);
 }
 
+export async function requestWorkflowApproval(
+  root: string,
+  store: TaskStore,
+  runId: string,
+  stepId: string,
+  action: string,
+  artifactPath: string,
+): Promise<ApprovalRequest> {
+  const artifact = await artifactEvidence(root, artifactPath);
+  return store.requestWorkflowStepApproval(
+    runId,
+    stepId,
+    action,
+    artifact.relativePath,
+    artifact.sha256,
+  ).approval;
+}
+
 export async function decideApproval(
   root: string,
   store: TaskStore,

@@ -3,15 +3,17 @@ import { z } from "zod";
 import { AGENT_IDS } from "../agents/types.js";
 import type { WorkflowDefinition } from "./types.js";
 
-export const WORKFLOW_RUN_STATUSES = ["running", "blocked", "failed", "completed"] as const;
+export const WORKFLOW_RUN_STATUSES = ["running", "waiting_approval", "blocked", "failed", "completed"] as const;
 export const workflowRunStatusSchema = z.enum(WORKFLOW_RUN_STATUSES);
 
 export const persistedWorkflowStepSchema = z.object({
   step_id: z.string().regex(/^[a-z0-9-]+$/),
-  agent_id: z.enum(AGENT_IDS),
-  status: z.enum(["pending", "running", "completed", "skipped", "blocked", "failed"]),
+  step_type: z.enum(["agent", "approval"]).default("agent"),
+  agent_id: z.enum(AGENT_IDS).nullable(),
+  status: z.enum(["pending", "running", "waiting_approval", "completed", "skipped", "blocked", "failed"]),
   attempts: z.number().int().min(0),
   handoff_id: z.string().regex(/^HANDOFF-[A-Z0-9-]+$/).nullable(),
+  approval_id: z.string().regex(/^APPROVAL-[A-Z0-9-]+$/).nullable().default(null),
   error: z.string().nullable(),
 }).strict();
 
@@ -43,10 +45,12 @@ export function createWorkflowRun(workflow: WorkflowDefinition, taskId: string, 
     status: "running",
     steps: workflow.steps.map((step) => ({
       step_id: step.id,
-      agent_id: step.agent,
+      step_type: step.type,
+      agent_id: step.type === "agent" ? step.agent : null,
       status: "pending",
       attempts: 0,
       handoff_id: null,
+      approval_id: null,
       error: null,
     })),
     created_at: timestamp,

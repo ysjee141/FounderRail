@@ -8,6 +8,19 @@ test("loads and validates the idea validation workflow", async () => {
   assert.deepEqual(workflow.steps[2]?.requires, ["product-discovery", "finance-review"]);
 });
 
+test("loads a typed artifact-bound approval step", async () => {
+  const workflow = await loadWorkflow(process.cwd(), "feature-delivery");
+  const approval = workflow.steps.find((step) => step.type === "approval");
+  assert.deepEqual(approval, {
+    id: "release-approval",
+    type: "approval",
+    action: "release",
+    artifact: "company/release-checklist.md",
+    requires: ["scope-review"],
+    when: "always",
+  });
+});
+
 test("rejects unknown dependencies and cycles", () => {
   assert.throws(() => validateWorkflow({
     id: "broken",

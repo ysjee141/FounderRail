@@ -13,17 +13,35 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "agent", "prompt", "requires", "when", "retry"],
-        "properties": {
-          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-          "agent": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
-          "prompt": { "type": "string", "minLength": 1 },
-          "requires": { "type": "array", "items": { "type": "string" } },
-          "when": { "enum": ["always", "risk_flags_present"] },
-          "retry": { "type": "integer", "minimum": 0, "maximum": 3 }
-        }
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "agent", "prompt", "requires", "when", "retry"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+              "type": { "const": "agent" },
+              "agent": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
+              "prompt": { "type": "string", "minLength": 1 },
+              "requires": { "type": "array", "items": { "type": "string" } },
+              "when": { "enum": ["always", "risk_flags_present"] },
+              "retry": { "type": "integer", "minimum": 0, "maximum": 3 }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "action", "artifact", "requires", "when"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+              "type": { "const": "approval" },
+              "action": { "type": "string", "minLength": 1 },
+              "artifact": { "type": "string", "minLength": 1 },
+              "requires": { "type": "array", "items": { "type": "string" } },
+              "when": { "enum": ["always", "risk_flags_present"] }
+            }
+          }
+        ]
       }
     }
   }
