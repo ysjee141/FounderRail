@@ -11,6 +11,8 @@ npm link
 
 team doctor
 team init --runtime codex
+team agents
+team ask finance-ops "이번 달 runway 계산에 필요한 자료를 정리해줘" --dry-run
 team run --prompt "현재 저장소의 상태를 한 문단으로 요약해줘"
 ```
 

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-team.local/schemas/agent-result.schema.json",
+  "title": "Agent Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "summary", "artifacts", "evidence", "decisions", "assumptions", "risks", "requested_next_agent"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["completed", "needs_input", "blocked", "ready_for_review"]
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "source"],
+        "properties": {
+          "claim": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "requested_next_agent": {
+      "type": ["string", "null"],
+      "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality", null]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+id: finance-ops
+name: Finance & Operations
+description: 현금흐름, 비용, 행정 의무와 전문가 전달 자료를 관리한다.
+triggers:
+  - expense.created
+  - pricing.review_requested
+  - monthly.close
+context:
+  read:
+    - company/goals.md
+    - company/finance/**
+    - company/metrics/**
+    - company/vendor-register.yaml
+  write:
+    - company/finance/**
+tools:
+  allow:
+    - filesystem.read
+    - filesystem.write_scoped
+    - calculator
+  deny:
+    - payment.execute
+    - bank.transfer
+    - tax.submit
+outputs:
+  schema: schemas/agent-result.schema.json
+approval:
+  required_for:
+    - external_write
+    - financial_commitment
+    - tax.submit
