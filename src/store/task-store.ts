@@ -106,6 +106,12 @@ export class TaskStore {
     return taskContractSchema.parse(JSON.parse(row.document));
   }
 
+  listTasks(): TaskContract[] {
+    const rows = this.db.prepare("SELECT document FROM tasks ORDER BY updated_at DESC, id DESC")
+      .all() as Array<{ document: string }>;
+    return rows.map((row) => taskContractSchema.parse(JSON.parse(row.document)));
+  }
+
   transitionTask(id: string, to: TaskStatus): TaskContract {
     const current = this.getTask(id);
     assertTaskTransition(current.status, to);
