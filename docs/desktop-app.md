@@ -53,6 +53,15 @@ Feature Delivery workflow는 제품 명세, Engineering 계획, 구현, Engineer
 
 Release 승인 요청은 승인 문서와 코드 diff를 각각 보여줍니다. 승인 hash는 release checklist에 적용됩니다. diff도 직접 확인한 뒤 이유를 입력하고 승인 또는 거절을 선택합니다. 승인 결정은 merge나 배포를 실행하지 않습니다.
 
+## 사업 운영과 지식 상태
+
+- **주간 운영**은 고객·제품·현금·위험 자료를 모아 창업자 결정 항목을 준비합니다.
+- **월간 마감**은 매출·비용·현금·runway와 자료 공백을 정리합니다.
+- **사건 검토**는 기술·고객·데이터 영향을 나누고 사람의 결정을 준비합니다.
+- **지식 자료**는 프로젝트 Knowledge Card와 source manifest를 검사합니다. 만료되거나 검증되지 않은 source와 module coverage gap을 보여줍니다.
+
+업무 입력은 프로젝트의 `.agent-team/state.db`에 저장됩니다. 주민등록번호, 계좌번호, 비밀번호와 고객 식별자는 입력하지 마세요. 필요한 경우 합계 또는 가명 자료를 사용하세요. 이 화면은 지식 source를 수집하거나 검증 상태로 바꾸지 않습니다.
+
 ## Agent 실행과 데이터 위치
 
 앱에 포함된 `agents/`, `workflows/`, `schemas/` 정의를 사용합니다. 실제 프로젝트의 회사 문서와 지식 자료는 선택한 프로젝트 폴더에서 읽습니다. Task, Handoff, Workflow 실행은 선택한 프로젝트의 `.agent-team/state.db`에 저장합니다.
@@ -61,4 +70,4 @@ Agent 실행은 선택한 CLI를 로컬 subprocess로 호출합니다. Harness�
 
 ## 현재 범위
 
-현재 화면에서 할 수 있는 일은 프로젝트 초기화, Runtime 선택, 아이디어 검증, Feature Delivery 실행, Task·Workflow 상태 확인, Git diff 검토와 Release 승인 기록입니다. 앱은 merge와 배포를 실행하지 않습니다. 지식 자료, 재무 관리와 보안 관리 화면은 아직 연결하지 않았습니다.
+현재 화면에서 할 수 있는 일은 프로젝트 초기화, Runtime 선택, 아이디어 검증, Feature Delivery, 주간 운영, 월간 마감, 사건 검토, Knowledge 상태 확인, Task·Workflow 상태 확인, Git diff 검토와 Release 승인 기록입니다. 지식 편집, 회계 시스템 연동, merge와 배포는 앱에서 실행하지 않습니다.

@@ -64,7 +64,7 @@ async function readGitStatus(root: string): Promise<DesktopProjectSnapshot["git"
 async function readHarnessDefinitions(harnessRoot: string): Promise<Pick<DesktopProjectSnapshot, "agents" | "workflows">> {
   const registry = await AgentRegistry.load(harnessRoot);
   const agents = registry.list().map(({ id, name, description }) => ({ id, name, description }));
-  const workflowIds = ["idea-validation", "feature-delivery", "weekly-operations"];
+  const workflowIds = ["idea-validation", "feature-delivery", "weekly-operations", "monthly-close", "incident"];
   const workflows = await Promise.all(workflowIds.map(async (id) => {
     const workflow = await loadWorkflow(harnessRoot, id);
     return {
