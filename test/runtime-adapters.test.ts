@@ -29,7 +29,7 @@ test("Claude uses non-interactive streaming JSON in plan mode", () => {
 test("Codex reads the prompt from stdin and uses a read-only sandbox", () => {
   const invocation = new CodexRuntimeAdapter().buildInvocation(request);
   assert.equal(invocation.stdin, request.prompt);
-  assert.deepEqual(invocation.args, ["exec", "--json", "--sandbox", "read-only", "--ask-for-approval", "never", "-"]);
+  assert.deepEqual(invocation.args, ["--ask-for-approval", "never", "exec", "--json", "--sandbox", "read-only", "-"]);
 });
 
 test("Gemini uses headless streaming JSON in plan mode", () => {
@@ -42,4 +42,16 @@ test("Gemini uses headless streaming JSON in plan mode", () => {
     "--approval-mode",
     "plan",
   ]);
+});
+
+test("Claude and Codex use their native structured-output schema flags", () => {
+  const outputSchema = {
+    schema: { type: "object", required: ["summary"] },
+    path: "/tmp/project/schemas/agent-result.schema.json",
+  };
+  const claude = new ClaudeRuntimeAdapter().buildInvocation({ ...request, outputSchema });
+  const codex = new CodexRuntimeAdapter().buildInvocation({ ...request, outputSchema });
+
+  assert.deepEqual(claude.args.slice(-2), ["--json-schema", JSON.stringify(outputSchema.schema)]);
+  assert.deepEqual(codex.args.slice(-3), ["--output-schema", outputSchema.path, "-"]);
 });

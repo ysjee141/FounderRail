@@ -6,6 +6,9 @@ export class ClaudeRuntimeAdapter extends BaseRuntimeAdapter {
   readonly command = "claude";
 
   buildInvocation(request: RuntimeRunRequest): RuntimeInvocation {
+    const structuredOutputArgs = request.outputSchema
+      ? ["--json-schema", JSON.stringify(request.outputSchema.schema)]
+      : [];
     return {
       command: this.command,
       args: [
@@ -16,6 +19,7 @@ export class ClaudeRuntimeAdapter extends BaseRuntimeAdapter {
         "--verbose",
         "--permission-mode",
         request.mode === "read-only" ? "plan" : "acceptEdits",
+        ...structuredOutputArgs,
       ],
     };
   }
