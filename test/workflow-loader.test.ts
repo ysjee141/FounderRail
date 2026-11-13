@@ -38,3 +38,20 @@ test("rejects unknown dependencies and cycles", () => {
     ],
   }), InvalidWorkflowError);
 });
+
+test("restricts engineering execution modes to the engineering agent", () => {
+  assert.throws(() => validateWorkflow({
+    id: "unsafe-mode",
+    name: "Unsafe mode",
+    description: "Non-engineering write attempt",
+    steps: [{
+      id: "write",
+      agent: "product-growth",
+      execution: "engineering-implement",
+      prompt: "write code",
+      requires: [],
+      when: "always",
+      retry: 0,
+    }],
+  }), /restricted to the engineering agent/);
+});

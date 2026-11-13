@@ -5,29 +5,49 @@ steps:
   - id: product-spec
     type: agent
     agent: product-growth
+    execution: standard
     prompt: 대상 고객, 문제, 범위, 수용 조건과 성공 지표를 명확히 한다.
     requires: []
     when: always
     retry: 1
-  - id: engineering-change
+  - id: engineering-plan
     type: agent
     agent: engineering
-    prompt: 별도 worktree에서 최소 변경을 구현하고 검사 evidence와 rollback 계획을 남긴다.
+    execution: engineering-plan
+    prompt: 제품 명세와 기존 코드를 읽고 변경 파일, 검사, 위험과 rollback을 포함한 최소 구현 계획을 작성한다. 파일은 변경하지 않는다.
     requires: [product-spec]
+    when: always
+    retry: 1
+  - id: engineering-implement
+    type: agent
+    agent: engineering
+    execution: engineering-implement
+    prompt: 승인된 Task 쓰기 범위 안에서 계획을 구현하고 관련 검사를 실행한다. merge와 배포는 하지 않는다.
+    requires: [engineering-plan]
+    when: always
+    retry: 1
+  - id: engineering-review
+    type: agent
+    agent: engineering
+    execution: engineering-review
+    prompt: 구현과 diff를 읽기 전용으로 검토하고 수용 조건, 테스트, 회귀, 범위 이탈과 rollback 준비를 평가한다.
+    requires: [engineering-implement]
     when: always
     retry: 1
   - id: risk-review
     type: agent
     agent: risk-quality
+    execution: standard
     prompt: 명시된 risk flag에 해당하는 변경만 검토하고 finding과 남은 위험을 기록한다.
-    requires: [engineering-change]
+    requires: [engineering-review]
     when: risk_flags_present
     retry: 1
   - id: scope-review
     type: agent
     agent: founder-office
+    execution: standard
     prompt: 변경이 승인된 목표와 범위를 충족하는지 확인하고 release 결정 항목을 정리한다.
-    requires: [engineering-change, risk-review]
+    requires: [engineering-review, risk-review]
     when: always
     retry: 1
   - id: release-approval

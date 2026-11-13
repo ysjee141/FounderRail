@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, realpath } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -38,6 +38,49 @@ function safeTaskSlug(taskId: string): string {
   return taskId.toLowerCase();
 }
 
+function statePath(root: string, taskId: string): string {
+  return path.join(root, ".agent-team", "engineering-worktrees", `${safeTaskSlug(taskId)}.json`);
+}
+
+async function managedDirectory(root: string, relative: string): Promise<string> {
+  let target = root;
+  for (const segment of relative.split("/")) {
+    target = path.join(target, segment);
+    try {
+      const info = await lstat(target);
+      if (info.isSymbolicLink()) throw new Error(`Managed directory was redirected: ${relative}`);
+      if (!info.isDirectory()) throw new Error(`Managed path is not a directory: ${relative}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await mkdir(target);
+    }
+  }
+  if (await realpath(target) !== target) throw new Error(`Managed directory was redirected: ${relative}`);
+  return target;
+}
+
+async function validateWorktree(root: string, value: unknown): Promise<EngineeringWorktree> {
+  if (typeof value !== "object" || value === null) throw new Error("Invalid engineering worktree state");
+  const candidate = value as Partial<EngineeringWorktree>;
+  if (!candidate.taskId || !candidate.branch || !candidate.path || !candidate.baseCommit) {
+    throw new Error("Incomplete engineering worktree state");
+  }
+  const slug = safeTaskSlug(candidate.taskId);
+  const expectedPath = path.join(root, ".agent-team", "worktrees", slug);
+  if (candidate.path !== expectedPath || candidate.branch !== `agent-team/${slug}`) {
+    throw new Error("Engineering worktree state does not match its task");
+  }
+  const worktreeReal = await realpath(candidate.path);
+  if (worktreeReal !== expectedPath) throw new Error("Engineering worktree path was redirected");
+  if (await git(worktreeReal, ["branch", "--show-current"]) !== candidate.branch) {
+    throw new Error("Engineering worktree branch does not match saved state");
+  }
+  if (await git(worktreeReal, ["rev-parse", "--verify", `${candidate.baseCommit}^{commit}`]) !== candidate.baseCommit) {
+    throw new Error("Engineering worktree base commit is invalid");
+  }
+  return candidate as EngineeringWorktree;
+}
+
 export async function createEngineeringWorktree(
   root: string,
   taskId: string,
@@ -49,16 +92,41 @@ export async function createEngineeringWorktree(
 
   const slug = safeTaskSlug(taskId);
   const branch = `agent-team/${slug}`;
-  const worktreesDirectory = path.join(rootReal, ".agent-team", "worktrees");
+  const worktreesDirectory = await managedDirectory(rootReal, ".agent-team/worktrees");
   const worktreePath = path.join(worktreesDirectory, slug);
   const baseCommit = await git(rootReal, ["rev-parse", "--verify", `${baseRef}^{commit}`]);
   await git(rootReal, ["check-ref-format", "--branch", branch]);
-  await mkdir(worktreesDirectory, { recursive: true });
   await execFileAsync("git", ["-C", rootReal, "worktree", "add", "-b", branch, worktreePath, baseCommit], {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
   });
-  return { taskId, branch, path: worktreePath, baseCommit };
+  const worktree = { taskId, branch, path: worktreePath, baseCommit };
+  await managedDirectory(rootReal, ".agent-team/engineering-worktrees");
+  const stateFile = statePath(rootReal, taskId);
+  await writeFile(stateFile, `${JSON.stringify(worktree, null, 2)}\n`, { flag: "wx" });
+  return worktree;
+}
+
+export async function loadEngineeringWorktree(root: string, taskId: string): Promise<EngineeringWorktree> {
+  const rootReal = await realpath(root);
+  await managedDirectory(rootReal, ".agent-team/engineering-worktrees");
+  const value = JSON.parse(await readFile(statePath(rootReal, taskId), "utf8")) as unknown;
+  const worktree = await validateWorktree(rootReal, value);
+  if (worktree.taskId !== taskId) throw new Error(`Engineering worktree belongs to ${worktree.taskId}, not ${taskId}`);
+  return worktree;
+}
+
+export async function ensureEngineeringWorktree(
+  root: string,
+  taskId: string,
+  baseRef = "HEAD",
+): Promise<EngineeringWorktree> {
+  try {
+    return await loadEngineeringWorktree(root, taskId);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return createEngineeringWorktree(root, taskId, baseRef);
+  }
 }
 
 export async function collectWorktreeEvidence(
@@ -85,14 +153,22 @@ export async function collectWorktreeEvidence(
     diffCheckOutput = `${failure.stdout ?? ""}${failure.stderr ?? ""}`.trim() || failure.message || "git diff --check failed";
   }
 
+  const status = statusText ? statusText.split("\n") : [];
+  const changedFiles = new Set(changedText ? changedText.split("\n") : []);
+  for (const entry of status) {
+    const statusPath = entry.slice(3);
+    const finalPath = statusPath.includes(" -> ") ? statusPath.split(" -> ").at(-1) : statusPath;
+    if (finalPath) changedFiles.add(finalPath.replace(/^"|"$/g, ""));
+  }
+
   return {
     taskId: worktree.taskId,
     branch: worktree.branch,
     path: worktreeReal,
     baseCommit: worktree.baseCommit,
     headCommit: await git(worktreeReal, ["rev-parse", "HEAD"]),
-    status: statusText ? statusText.split("\n") : [],
-    changedFiles: changedText ? changedText.split("\n") : [],
+    status,
+    changedFiles: [...changedFiles].sort(),
     diffStat,
     diffCheckPassed,
     diffCheckOutput,

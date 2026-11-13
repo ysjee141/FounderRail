@@ -39,7 +39,7 @@ test("feature task reaches human-approved completion using structured handoffs",
     executedAgents.push(step.agent);
     if (step.agent === "product-growth") {
       await writeScopedArtifact(root, registry.get(step.agent), `work/specs/${task.id}.md`, "# Auth spec\n\nManaged authentication.\n");
-    } else if (step.agent === "engineering") {
+    } else if (step.execution === "engineering-implement") {
       await writeScopedArtifact(root, registry.get(step.agent), `work/releases/${task.id}.md`, "# Release candidate\n\nTests: fake:test passed.\nRollback: disable feature flag.\n");
     } else if (step.agent === "risk-quality") {
       await writeScopedArtifact(root, registry.get(step.agent), `work/risk-reviews/${task.id}.md`, "# Risk review\n\nAuthentication review completed.\n");
@@ -66,9 +66,16 @@ test("feature task reaches human-approved completion using structured handoffs",
   ).then(() => undefined));
 
   assert.equal(execution.status, "waiting_approval");
-  assert.deepEqual(executedAgents, ["product-growth", "engineering", "risk-quality", "founder-office"]);
+  assert.deepEqual(executedAgents, [
+    "product-growth",
+    "engineering",
+    "engineering",
+    "engineering",
+    "risk-quality",
+    "founder-office",
+  ]);
   assert.equal(store.getTask(task.id).status, "waiting_approval");
-  assert.equal(store.listHandoffs(task.id).length, 4);
+  assert.equal(store.listHandoffs(task.id).length, 6);
 
   const approval = execution.steps.find((step) => step.stepId === "release-approval")?.approval;
   assert.ok(approval);

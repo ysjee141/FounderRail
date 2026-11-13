@@ -28,6 +28,14 @@ function valueAfter(args: string[], flag: string): string | undefined {
   return index === -1 ? undefined : args[index + 1];
 }
 
+function valuesAfter(args: string[], flag: string): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === flag && args[index + 1] && !args[index + 1]?.startsWith("--")) values.push(args[index + 1] as string);
+  }
+  return values;
+}
+
 function usage(): void {
   console.log(`Usage:
   team init --runtime <claude|codex|gemini>
@@ -37,7 +45,7 @@ function usage(): void {
   team agents
   team ask <agent-id> <request> [--dry-run]
   team bootstrap status
-  team task create --owner <agent-id> --objective <text> --why <text>
+  team task create --owner <agent-id> --objective <text> --why <text> [--write <path/**>]... [--forbid <action>]...
   team task show <task-id>
   team task transition <task-id> <status>
   team handoff record --task <task-id> --agent <agent-id> --from <json-file>
@@ -180,7 +188,7 @@ async function task(root: string, args: string[]): Promise<void> {
       objective,
       why,
       inputs: [],
-      scope: { writable_paths: [], forbidden_actions: [] },
+      scope: { writable_paths: valuesAfter(args, "--write"), forbidden_actions: valuesAfter(args, "--forbid") },
       acceptance: [],
       checks: [],
       risk_flags: [],

@@ -54,6 +54,14 @@ team workflow resume <run-id> # 승인 뒤 후속 step이 있을 때
 
 ## Engineering worktree
 
+`feature-delivery`는 Engineering을 세 개의 독립 세션으로 실행한다.
+
+1. `engineering-plan`: 기본 checkout에서 읽기 전용 계획
+2. `engineering-implement`: Task 전용 managed worktree에서 `workspace-write`
+3. `engineering-review`: 같은 worktree에서 읽기 전용 diff 검토
+
+Harness는 구현·검토 뒤 `git diff --check`, 변경 파일, branch와 HEAD를 결정적으로 수집해 Handoff evidence에 추가한다. 변경 파일이 Task의 `scope.writable_paths` 밖이면 step을 실패시키며, main checkout에는 적용하지 않는다. worktree 정보는 `.agent-team/engineering-worktrees/<task-id>.json`에 저장되어 재개 시 같은 branch를 사용한다.
+
 ```bash
 team worktree create <task-id>
 team worktree inspect <task-id> --base-commit <sha>

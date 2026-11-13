@@ -14,6 +14,7 @@ export const agentWorkflowStepSchema = z.object({
   type: z.literal("agent"),
   agent: z.enum(AGENT_IDS),
   prompt: z.string().min(1),
+  execution: z.enum(["standard", "engineering-plan", "engineering-implement", "engineering-review"]).default("standard"),
   retry: z.number().int().min(0).max(3).default(1),
 }).strict();
 
@@ -36,6 +37,16 @@ export const workflowDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   steps: z.array(workflowStepSchema).min(1),
+}).superRefine((workflow, context) => {
+  for (const [index, step] of workflow.steps.entries()) {
+    if (step.type === "agent" && step.execution !== "standard" && step.agent !== "engineering") {
+      context.addIssue({
+        code: "custom",
+        path: ["steps", index, "execution"],
+        message: `${step.execution} is restricted to the engineering agent`,
+      });
+    }
+  }
 });
 
 export type WorkflowStep = z.infer<typeof workflowStepSchema>;

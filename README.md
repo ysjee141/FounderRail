@@ -45,6 +45,8 @@ Workflow에는 `type: approval` step을 둘 수 있습니다. 해당 지점에�
 
 Engineering 변경은 `.agent-team/worktrees/<task-id>`의 전용 branch에서 수행합니다. Harness는 worktree와 diff evidence를 만들지만 merge, production 배포, worktree 삭제는 자동 실행하지 않습니다.
 
+`feature-delivery`의 Engineering은 계획·구현·검토 세션으로 분리됩니다. 구현 세션만 managed worktree 쓰기가 가능하고, 완료 뒤 실제 변경 파일을 Task의 `writable_paths`와 대조합니다. 계획과 검토 세션은 읽기 전용이며 세 세션의 결과가 각각 검증된 Handoff로 남습니다.
+
 전체 설계와 단계별 구현 계획은 [agent-team-harness-plan.md](./agent-team-harness-plan.md)를 참고합니다.
 
 - [시작 안내](./docs/getting-started.md)
