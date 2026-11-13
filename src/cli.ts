@@ -8,6 +8,7 @@ import { loadAgentContext } from "./context/loader.js";
 import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
+import { collectWorktreeEvidence, createEngineeringWorktree } from "./engineering/worktree.js";
 import { approvalDecisionSchema } from "./approvals/contracts.js";
 import { decideApproval, requestApproval } from "./approvals/service.js";
 import { resolveExistingProjectFile } from "./security/project-path.js";
@@ -40,6 +41,8 @@ function usage(): void {
   team inbox
   team approval request --task <task-id> --action <name> --artifact <project-file>
   team approval decide <approval-id> <approve|reject|request_changes> --reason <text>
+  team worktree create <task-id> [--base <git-ref>]
+  team worktree inspect <task-id> --base-commit <sha>
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -233,6 +236,28 @@ async function approval(root: string, args: string[]): Promise<void> {
   throw new Error("Usage: team approval <request|decide> ...");
 }
 
+async function worktree(root: string, args: string[]): Promise<void> {
+  if (args[0] === "create" && args[1]) {
+    console.log(JSON.stringify(await createEngineeringWorktree(root, args[1], valueAfter(args, "--base") ?? "HEAD"), null, 2));
+    return;
+  }
+  if (args[0] === "inspect" && args[1]) {
+    const baseCommit = valueAfter(args, "--base-commit");
+    if (!baseCommit) throw new Error("--base-commit is required");
+    const taskId = args[1];
+    if (!/^TASK-[A-Z0-9-]+$/.test(taskId)) throw new Error(`Invalid task id for worktree: ${taskId}`);
+    const slug = taskId.toLowerCase();
+    console.log(JSON.stringify(await collectWorktreeEvidence(root, {
+      taskId,
+      branch: `agent-team/${slug}`,
+      path: path.join(root, ".agent-team", "worktrees", slug),
+      baseCommit,
+    }), null, 2));
+    return;
+  }
+  throw new Error("Usage: team worktree <create|inspect> ...");
+}
+
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const root = process.cwd();
@@ -251,6 +276,7 @@ async function main(): Promise<void> {
   else if (command === "workflow") await workflow(root, args);
   else if (command === "inbox") await inbox(root);
   else if (command === "approval") await approval(root, args);
+  else if (command === "worktree") await worktree(root, args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }
