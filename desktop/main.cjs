@@ -118,6 +118,35 @@ function registerIpc() {
     if (!activeProjectRoot) throw new Error("Open a project folder first.");
     return (await service()).startDesktopIdeaValidation(activeProjectRoot, appRoot, input);
   });
+
+  ipcMain.handle("workflows:startFeatureDelivery", async (event, input) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    return (await service()).startDesktopFeatureDelivery(activeProjectRoot, appRoot, input);
+  });
+
+  ipcMain.handle("reviews:getTask", async (event, taskId) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    if (typeof taskId !== "string" || !/^TASK-[A-Z0-9-]+$/.test(taskId)) throw new Error("Invalid Task id.");
+    return (await service()).getDesktopTaskReview(activeProjectRoot, taskId);
+  });
+
+  ipcMain.handle("approvals:getArtifact", async (event, approvalId) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    if (typeof approvalId !== "string" || !/^APPROVAL-[A-Z0-9-]+$/.test(approvalId)) throw new Error("Invalid approval id.");
+    return (await service()).getDesktopApprovalArtifact(activeProjectRoot, approvalId);
+  });
+
+  ipcMain.handle("approvals:decide", async (event, approvalId, decision, reason) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    if (typeof approvalId !== "string" || !/^APPROVAL-[A-Z0-9-]+$/.test(approvalId)) throw new Error("Invalid approval id.");
+    if (decision !== "approve" && decision !== "reject") throw new Error("Choose approve or reject.");
+    if (typeof reason !== "string") throw new Error("Enter a decision reason.");
+    return (await service()).decideDesktopApproval(activeProjectRoot, appRoot, approvalId, decision, reason);
+  });
 }
 
 function createWindow() {

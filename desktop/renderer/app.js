@@ -1,5 +1,5 @@
 const app = document.querySelector("#app");
-const state = { project: null, recent: [], busy: false, pollTimer: null };
+const state = { project: null, recent: [], busy: false, pollTimer: null, taskReview: null, taskReviewLoading: null, taskReviewError: null, approvalArtifact: null, approvalLoading: null };
 
 const runtimeNames = {
   claude: "Claude Code",
@@ -125,7 +125,7 @@ function sidebar(snapshot, selected) {
       <nav class="nav-list">
         <button class="nav-item ${selected === "overview" ? "active" : ""}" data-nav="overview"><span class="icon">◫</span>개요</button>
         <button class="nav-item" data-nav="ideas"><span class="icon">✳</span>사업 검증</button>
-        <button class="nav-item" data-nav="build" disabled title="다음 단계에서 연결합니다"><span class="icon">⌘</span>제품 개발</button>
+        <button class="nav-item" data-nav="build" ${snapshot.git.isRepository && snapshot.git.clean ? "" : "disabled"} title="Git 저장소가 깨끗해야 제품 개발을 시작할 수 있습니다."><span class="icon">⌘</span>제품 개발</button>
       </nav>
       <div class="nav-label spaced">Company</div>
       <nav class="nav-list">
@@ -146,7 +146,13 @@ function taskRows(tasks) {
 function runRows(runs) {
   if (!runs.length) return `<div class="empty-state"><div class="empty-mark">↗</div><div class="empty-title">실행 기록이 없습니다.</div><div class="empty-copy">workflow 실행 결과가 이곳에 표시됩니다.</div></div>`;
   return `<div class="run-list">${runs.slice(0, 5).map((run) => `
-    <div class="run-row"><div class="row-primary"><div class="row-title">${escapeHtml(run.workflow_id)}</div><div class="row-meta">${escapeHtml(run.id)} · ${escapeHtml(run.task_id)} · ${dateLabel(run.updated_at)}</div><div class="row-meta">단계 ${run.steps.filter((step) => ["completed", "skipped"].includes(step.status)).length}/${run.steps.length} 완료${run.status === "running" ? ` · ${escapeHtml(run.steps.find((step) => step.status === "running")?.step_id || "준비 중")}` : ""}</div>${run.steps.find((step) => step.error)?.error ? `<div class="run-error">${escapeHtml(run.steps.find((step) => step.error).error)}</div>` : ""}</div>${badge(run.status)}</div>`).join("")}</div>`;
+    <div class="run-row"><div class="row-primary"><div class="row-title">${escapeHtml(run.workflow_id)}</div><div class="row-meta">${escapeHtml(run.id)} · ${escapeHtml(run.task_id)} · ${dateLabel(run.updated_at)}</div><div class="row-meta">단계 ${run.steps.filter((step) => ["completed", "skipped"].includes(step.status)).length}/${run.steps.length} 완료${run.status === "running" ? ` · ${escapeHtml(run.steps.find((step) => step.status === "running")?.step_id || "준비 중")}` : ""}</div>${run.steps.find((step) => step.error)?.error ? `<div class="run-error">${escapeHtml(run.steps.find((step) => step.error).error)}</div>` : ""}${run.workflow_id === "feature-delivery" && run.steps.some((step) => step.step_id === "engineering-implement" && step.status === "completed") ? `<button class="text-link review-link" data-review-task="${escapeHtml(run.task_id)}">변경 검토</button>` : ""}</div>${badge(run.status)}</div>`).join("")}</div>`;
+}
+
+function approvalRows(approvals) {
+  if (!approvals.length) return `<div class="empty-copy">현재 승인 요청이 없습니다.</div>`;
+  return `<div class="approval-list">${approvals.map((approval) => `
+    <div class="approval-row"><div class="row-primary"><div class="row-title">${escapeHtml(approval.action)} · ${escapeHtml(approval.task_id)}</div><div class="row-meta">검토 문서: ${escapeHtml(approval.artifact_path)} · ${dateLabel(approval.created_at)}</div></div><button class="button secondary small-button" data-approval-artifact="${escapeHtml(approval.id)}">문서와 diff 검토</button></div>`).join("")}</div>`;
 }
 
 function renderDashboard(snapshot) {
@@ -163,11 +169,11 @@ function renderDashboard(snapshot) {
       ${sidebar(snapshot, "overview")}
       <main class="main-area">
         <div class="topbar"><div class="crumb">Workspace <span> / </span><strong>${escapeHtml(snapshot.name)}</strong></div><div class="top-actions"><button class="button secondary" id="open-another">프로젝트 전환</button><button class="icon-button" id="refresh" aria-label="새로고침">↻</button><div class="avatar">나</div></div></div>
-        <div class="page-head"><div><div class="eyebrow">Your company workspace</div><h1>좋은 아침입니다.</h1><p class="subtitle">사업 가설, 제품 작업, Agent 팀의 진행 상황을 이곳에서 확인하세요.</p></div><div class="head-actions"><button class="button secondary" id="setup-button">프로젝트 설정</button><button class="button" id="new-idea">아이디어 검증 시작 <span>→</span></button></div></div>
+        <div class="page-head"><div><div class="eyebrow">Your company workspace</div><h1>좋은 아침입니다.</h1><p class="subtitle">사업 가설, 제품 작업, Agent 팀의 진행 상황을 이곳에서 확인하세요.</p></div><div class="head-actions"><button class="button secondary" id="setup-button">프로젝트 설정</button><button class="button secondary" id="new-feature" ${snapshot.git.isRepository && snapshot.git.clean ? "" : "disabled"}>제품 개발 시작</button><button class="button" id="new-idea">아이디어 검증 시작 <span>→</span></button></div></div>
         ${selectedRuntime?.available ? "" : `<div class="notice warn"><span>!</span><span>선택한 Runtime을 찾을 수 없습니다. 프로젝트 설정에서 설치된 CLI를 선택하세요.</span></div>`}
-        ${!snapshot.git.isRepository ? `<div class="notice warn"><span>!</span><span>${gitMessage}</span></div>` : ""}
-        ${approvals ? `<div class="approval-banner"><div class="approval-left"><span class="approval-icon">!</span><span><span class="approval-title">검토가 필요한 승인 요청 ${approvals}건</span><span class="approval-copy">승인 검토 화면은 다음 작업 단계에서 연결합니다.</span></span></div><button class="button secondary" id="refresh-approvals">새로고침</button></div>` : ""}
+        ${!snapshot.git.isRepository ? `<div class="notice warn"><span>!</span><span>제품 개발 workflow는 Git 저장소가 필요합니다. 프로젝트 폴더에서 Git을 초기화하고 기준 commit을 만드세요.</span></div>` : !snapshot.git.clean ? `<div class="notice warn"><span>!</span><span>제품 개발을 시작하기 전에 현재 변경사항을 commit하거나 정리하세요. Agent는 별도 Task worktree에서 작업합니다.</span></div>` : ""}
         <div class="grid">
+          ${approvals ? `<section class="card approval-panel"><div class="panel-header"><div><div class="panel-title">사람의 검토가 필요합니다</div><div class="panel-description">승인 전에 Task 변경 diff와 승인 문서를 함께 확인하세요.</div></div><span class="badge waiting_approval">${approvals}건 대기</span></div>${approvalRows(snapshot.approvals)}</section>` : ""}
           <section class="card stat-card"><div class="stat-top"><span class="stat-label">전체 Task</span><span class="stat-icon">▤</span></div><div class="stat-value">${snapshot.tasks.length}</div><div class="stat-foot">${completedTasks}건 완료</div></section>
           <section class="card stat-card"><div class="stat-top"><span class="stat-label">진행 중인 Workflow</span><span class="stat-icon">↗</span></div><div class="stat-value">${activeRuns}</div><div class="stat-foot">실행, 확인 또는 승인 대기</div></section>
           <section class="card stat-card"><div class="stat-top"><span class="stat-label">승인 대기</span><span class="stat-icon">✓</span></div><div class="stat-value">${approvals}</div><div class="stat-foot">${snapshot.runtime ? escapeHtml(runtimeNames[snapshot.runtime]) : "Runtime 미설정"}</div></section>
@@ -175,6 +181,8 @@ function renderDashboard(snapshot) {
           <section class="card panel"><div class="panel-header"><div><div class="panel-title">최근 작업</div><div class="panel-description">Task 상태와 담당 Agent</div></div><button class="text-link" id="refresh-tasks">새로고침</button></div>${taskRows(snapshot.tasks)}</section>
           <section class="card panel side-panel"><div class="panel-header"><div><div class="panel-title">Workflow 기록</div><div class="panel-description">Agent 단계와 승인 진행 상황</div></div><button class="text-link" id="refresh-runs">새로고침</button></div>${runRows(snapshot.runs)}</section>
           <section class="card panel"><div class="panel-header"><div><div class="panel-title">최근 Agent 결과</div><div class="panel-description">Agent가 다음 작업자에게 전달한 요약</div></div></div>${handoffRows(snapshot.handoffs)}</section>
+          ${renderTaskReview()}
+          ${renderApprovalArtifact()}
           <section class="card panel side-panel"><div class="panel-header"><div><div class="panel-title">사용 가능한 Agent</div><div class="panel-description">선택한 Runtime으로 역할을 실행합니다</div></div><span class="badge ready">${escapeHtml(runtimeNames[snapshot.runtime] ?? "설정 필요")}</span></div><div class="grid agent-grid">${snapshot.agents.slice(0, 6).map((agent) => `<div class="card agent-card"><div class="agent-name">${escapeHtml(agent.name)}</div><div class="agent-description">${escapeHtml(agent.description)}</div></div>`).join("")}</div></section>
           <section class="card panel"><div class="panel-header"><div><div class="panel-title">시작할 Workflow</div><div class="panel-description">이 프로젝트에서 사용할 수 있는 작업 흐름</div></div></div><div class="task-list">${snapshot.workflows.map((workflow) => `<div class="task-row"><div><div class="row-title">${escapeHtml(workflow.name)}</div><div class="row-meta">${escapeHtml(workflow.description)}</div></div><span class="badge">${workflow.stepCount}단계</span></div>`).join("")}</div></section>
         </div>
@@ -188,7 +196,17 @@ function renderDashboard(snapshot) {
   document.querySelector("#refresh-approvals")?.addEventListener("click", refreshProject);
   document.querySelector("#setup-button").addEventListener("click", () => runtimeSetup(state.project));
   document.querySelector("#new-idea").addEventListener("click", openIdeaDialog);
+  document.querySelector("#new-feature").addEventListener("click", openFeatureDialog);
   document.querySelectorAll('[data-nav="ideas"]').forEach((button) => button.addEventListener("click", openIdeaDialog));
+  document.querySelectorAll('[data-nav="build"]').forEach((button) => button.addEventListener("click", openFeatureDialog));
+  document.querySelectorAll("[data-review-task]").forEach((button) => button.addEventListener("click", () => openTaskReview(button.dataset.reviewTask)));
+  document.querySelectorAll("[data-approval-artifact]").forEach((button) => button.addEventListener("click", () => openApprovalArtifact(button.dataset.approvalArtifact)));
+  document.querySelector("#approve-release")?.addEventListener("click", () => decideApproval("approve"));
+  document.querySelector("#reject-release")?.addEventListener("click", () => decideApproval("reject"));
+  document.querySelector("#close-review")?.addEventListener("click", () => { state.taskReview = null; state.taskReviewError = null; render(); });
+  document.querySelector("#close-review-error")?.addEventListener("click", () => { state.taskReviewError = null; render(); });
+  document.querySelector("#close-approval-review")?.addEventListener("click", () => { state.approvalArtifact = null; render(); });
+  document.querySelectorAll("[data-review-approval-task]").forEach((button) => button.addEventListener("click", () => openTaskReview(button.dataset.reviewApprovalTask)));
   syncWorkflowPolling(snapshot);
 }
 
@@ -196,6 +214,98 @@ function handoffRows(handoffs) {
   if (!handoffs?.length) return `<div class="empty-state compact-empty"><div class="empty-mark">↗</div><div class="empty-title">아직 전달된 결과가 없습니다.</div><div class="empty-copy">아이디어 검증을 실행하면 Agent별 분석이 여기에 표시됩니다.</div></div>`;
   return `<div class="handoff-list">${handoffs.slice(-6).reverse().map((handoff) => `
     <article class="handoff-row"><div class="handoff-head"><div><div class="row-title">${escapeHtml(handoff.agent_id)} · ${escapeHtml(handoff.task_id)}</div><div class="row-meta">${dateLabel(handoff.created_at)}</div></div>${badge(handoff.status)}</div><p class="handoff-summary">${escapeHtml(handoff.summary)}</p>${handoff.decisions?.length ? `<div class="handoff-points"><strong>결정 항목</strong><ul>${handoff.decisions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>` : ""}${handoff.risks?.length ? `<div class="handoff-risk">남은 위험: ${escapeHtml(handoff.risks.slice(0, 2).join(" · "))}</div>` : ""}</article>`).join("")}</div>`;
+}
+
+function renderTaskReview() {
+  if (state.taskReviewLoading) return `<section class="card review-panel"><div class="loading"><span class="spinner"></span><span>${escapeHtml(state.taskReviewLoading)}의 변경사항을 불러옵니다</span></div></section>`;
+  if (state.taskReviewError) return `<section class="card review-panel"><div class="panel-header"><div class="panel-title">변경사항을 열지 못했습니다.</div><button class="text-link" id="close-review-error">닫기</button></div><p class="run-error">${escapeHtml(state.taskReviewError)}</p></section>`;
+  const review = state.taskReview;
+  if (!review) return "";
+  return `<section class="card review-panel"><div class="panel-header"><div><div class="panel-title">코드 변경 검토 · ${escapeHtml(review.taskId)}</div><div class="panel-description">branch ${escapeHtml(review.branch)} · ${escapeHtml(review.baseCommit.slice(0, 10))} → ${escapeHtml(review.headCommit.slice(0, 10))}</div></div><button class="text-link" id="close-review">닫기</button></div>
+    <div class="review-summary"><span class="badge ${review.diffCheckPassed ? "completed" : "failed"}">${review.diffCheckPassed ? "diff 검사 통과" : "diff 검사 실패"}</span><span>${escapeHtml(review.diffStat || "변경 파일 없음")}</span></div>
+    ${review.changedFiles.length ? `<div class="changed-files"><strong>변경 파일</strong>${review.changedFiles.map((file) => `<code>${escapeHtml(file)}</code>`).join("")}</div>` : ""}
+    ${review.diffCheckOutput ? `<pre class="diff-check">${escapeHtml(review.diffCheckOutput)}</pre>` : ""}
+    ${review.diffTruncated ? `<div class="notice warn">Diff 미리보기가 길이 제한으로 일부만 표시됩니다. Task worktree에서 전체 diff를 검토하세요.</div>` : ""}
+    <pre class="diff-view">${escapeHtml(review.diff || "표시할 diff가 없습니다.")}</pre>
+  </section>`;
+}
+
+function renderApprovalArtifact() {
+  if (state.approvalLoading) return `<section class="card review-panel"><div class="loading"><span class="spinner"></span><span>승인 문서를 불러옵니다</span></div></section>`;
+  const detail = state.approvalArtifact;
+  if (!detail) return "";
+  const { approval } = detail;
+  const linkedRun = state.project?.runs.find((run) => run.id === approval.workflow_run_id);
+  const requiresCodeReview = linkedRun?.workflow_id === "feature-delivery";
+  const taskReview = state.taskReview?.taskId === approval.task_id ? state.taskReview : null;
+  const canApprove = !detail.artifactChanged && (!requiresCodeReview || taskReview?.diffCheckPassed === true);
+  return `<section class="card review-panel"><div class="panel-header"><div><div class="panel-title">승인 문서 · ${escapeHtml(approval.action)}</div><div class="panel-description">${escapeHtml(approval.artifact_path)} · Task ${escapeHtml(approval.task_id)}</div></div><button class="text-link" id="close-approval-review">닫기</button></div>
+    <div class="notice ${detail.artifactChanged ? "warn" : "info"}"><span>${detail.artifactChanged ? "!" : "✓"}</span><span>${detail.artifactChanged ? "요청 이후 승인 문서가 바뀌었습니다. 기존 요청을 승인할 수 없습니다." : "요청 당시의 문서 hash와 현재 문서가 같습니다."} 승인 결정은 이 문서에 적용됩니다. 코드 diff도 별도로 검토하세요.</span></div>
+    <div class="artifact-hash">요청 hash: <code>${escapeHtml(approval.artifact_sha256)}</code><br />현재 hash: <code>${escapeHtml(detail.currentSha256)}</code></div>
+    <pre class="diff-view artifact-view">${escapeHtml(detail.content)}</pre>
+    ${requiresCodeReview ? `<button class="text-link" data-review-approval-task="${escapeHtml(approval.task_id)}">이 Task의 코드 diff 검토</button>` : ""}
+    ${approval.status === "pending" ? `${requiresCodeReview ? (taskReview ? `<label class="review-confirm"><input type="checkbox" id="approval-code-reviewed" />${taskReview.diffTruncated ? "전체 diff를 확인했습니다. 화면 밖의 변경도 확인했습니다." : "코드 diff를 확인했습니다."}</label>` : `<div class="field-help">승인하려면 먼저 이 Task의 코드 diff를 열고 검토하세요.</div>`) : ""}<label class="decision-reason">결정 사유<textarea id="approval-reason" rows="2" maxlength="1000" placeholder="검토한 내용과 결정을 기록하세요."></textarea></label><div class="modal-footer"><button class="button danger-button" id="reject-release">거절</button><button class="button" id="approve-release" ${canApprove ? "" : "disabled"}>승인</button></div>` : `<div class="notice info">이 요청의 상태: ${escapeHtml(approval.status)}</div>`}
+  </section>`;
+}
+
+async function openTaskReview(taskId) {
+  if (state.taskReviewLoading) return;
+  state.taskReviewLoading = taskId;
+  state.taskReviewError = null;
+  state.taskReview = null;
+  render();
+  try {
+    state.taskReview = await window.founderDesk.getTaskReview(taskId);
+  } catch (error) {
+    state.taskReviewError = error instanceof Error ? error.message : String(error);
+    toast(state.taskReviewError, true);
+  } finally {
+    state.taskReviewLoading = null;
+    render();
+  }
+}
+
+async function openApprovalArtifact(approvalId) {
+  if (state.approvalLoading) return;
+  state.approvalLoading = approvalId;
+  state.approvalArtifact = null;
+  render();
+  try {
+    state.approvalArtifact = await window.founderDesk.getApprovalArtifact(approvalId);
+  } catch (error) {
+    toast(error instanceof Error ? error.message : String(error), true);
+  } finally {
+    state.approvalLoading = null;
+    render();
+  }
+}
+
+async function decideApproval(decision) {
+  const detail = state.approvalArtifact;
+  const reason = document.querySelector("#approval-reason")?.value || "";
+  if (!detail) return;
+  if (decision === "approve") {
+    const linkedRun = state.project?.runs.find((run) => run.id === detail.approval.workflow_run_id);
+    const requiresCodeReview = linkedRun?.workflow_id === "feature-delivery";
+    if (requiresCodeReview && (!state.taskReview || state.taskReview.taskId !== detail.approval.task_id || !state.taskReview.diffCheckPassed)) {
+      toast("승인 전에 Task의 코드 diff를 열고 diff 검사를 확인하세요.", true);
+      return;
+    }
+    if (requiresCodeReview && !document.querySelector("#approval-code-reviewed")?.checked) {
+      toast("승인 전에 코드 diff 검토를 확인하세요.", true);
+      return;
+    }
+  }
+  if (!reason.trim()) {
+    toast("승인 또는 거절 사유를 입력하세요.", true);
+    return;
+  }
+  const result = await withBusy("승인 결정을 저장하고 있습니다", () => window.founderDesk.decideApproval(detail.approval.id, decision, reason));
+  if (result) {
+    state.approvalArtifact = null;
+    render();
+    toast(decision === "approve" ? "승인을 기록했습니다." : "거절을 기록했습니다.");
+  }
 }
 
 function openIdeaDialog() {
@@ -233,6 +343,47 @@ function openIdeaDialog() {
   });
 }
 
+function openFeatureDialog() {
+  if (document.querySelector("#idea-modal")) return;
+  const modal = document.createElement("div");
+  modal.id = "idea-modal";
+  modal.className = "modal-backdrop";
+  modal.innerHTML = `
+    <section class="modal-card wide-modal" role="dialog" aria-modal="true" aria-labelledby="feature-title">
+      <div class="modal-top"><div><div class="eyebrow">Feature delivery</div><h2 id="feature-title">Agent가 바꿀 범위를 정해주세요.</h2></div><button class="icon-button" id="close-idea" aria-label="닫기">×</button></div>
+      <p class="panel-description modal-description">Agent는 Task 전용 Git worktree에서 구현합니다. Harness는 쓰기 범위를 검사합니다. commit, merge, 배포는 직접 검토한 뒤 진행하세요.</p>
+      <form id="feature-form" class="idea-form">
+        <label>기능 목표<input name="objective" maxlength="180" required placeholder="예: 스톱워치 기록을 초기화할 수 있다" /></label>
+        <label>필요한 동작과 배경<textarea name="problem" rows="3" maxlength="3000" required placeholder="사용자 상황과 기대 동작을 적어주세요."></textarea></label>
+        <label>수정 가능한 파일 경로<textarea name="writablePaths" rows="2" required placeholder="한 줄에 하나씩 입력합니다. 예: src/**"></textarea><span class="field-help">필요한 최소 폴더를 입력하세요. 예: src/components/**</span></label>
+        <label>완료 조건<textarea name="acceptance" rows="3" required placeholder="한 줄에 하나씩 입력합니다. 예: 시작 버튼을 누르면 시간이 증가한다."></textarea></label>
+        <fieldset class="risk-choices"><legend>관련 위험을 선택하세요.</legend>${[["security", "보안"], ["personal-data", "개인정보"], ["payments", "결제"], ["authentication", "인증"], ["database", "데이터베이스"], ["network", "네트워크"]].map(([value, label]) => `<label><input type="checkbox" name="riskFlags" value="${value}" />${label}</label>`).join("")}</fieldset>
+        <div class="notice info"><span>i</span><span>프로젝트 Git 저장소가 깨끗할 때 시작할 수 있습니다. 변경 전 상태를 보존하고 Task별 branch를 만듭니다.</span></div>
+        <div class="modal-footer"><button type="button" id="cancel-idea" class="button secondary">취소</button><button type="submit" class="button">계획과 구현 시작 <span>→</span></button></div>
+      </form>
+    </section>`;
+  document.body.append(modal);
+  const close = () => modal.remove();
+  document.querySelector("#close-idea").addEventListener("click", close);
+  document.querySelector("#cancel-idea").addEventListener("click", close);
+  modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  document.querySelector("#feature-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const lines = (key) => String(values.get(key) || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+    const input = {
+      objective: String(values.get("objective") || ""),
+      problem: String(values.get("problem") || ""),
+      writablePaths: lines("writablePaths"),
+      acceptance: lines("acceptance"),
+      riskFlags: [...event.currentTarget.querySelectorAll('input[name="riskFlags"]:checked')].map((item) => item.value),
+    };
+    close();
+    const started = await withBusy("제품 개발 Task와 전용 worktree를 준비합니다", () => window.founderDesk.startFeatureDelivery(input));
+    if (started) toast("제품 개발 workflow를 시작했습니다. 계획·구현·검토 결과를 이 화면에서 확인하세요.");
+  });
+}
+
 function syncWorkflowPolling(snapshot) {
   const isRunning = snapshot.runs.some((run) => run.status === "running");
   if (isRunning && !state.pollTimer) {
@@ -261,11 +412,19 @@ function render() {
 
 async function withBusy(label, operation) {
   if (state.busy) return;
+  const previousRoot = state.project?.root;
   state.busy = true;
   app.innerHTML = `<div class="boot-screen"><span class="spinner"></span><span>${escapeHtml(label)}</span></div>`;
   try {
     const result = await operation();
-    if (result) state.project = result;
+    if (result) {
+      if (previousRoot && previousRoot !== result.root) {
+        state.taskReview = null;
+        state.taskReviewError = null;
+        state.approvalArtifact = null;
+      }
+      state.project = result;
+    }
     state.recent = await window.founderDesk.getRecentProjects();
     render();
     return result;

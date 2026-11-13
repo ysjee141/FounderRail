@@ -67,6 +67,8 @@ h1 { margin: 0; font-size: 27px; line-height: 1.28; letter-spacing: -1px; font-w
 .button { min-height: 38px; display: inline-flex; justify-content: center; align-items: center; gap: 8px; padding: 0 15px; border: 1px solid transparent; border-radius: 8px; color: white; background: var(--teal); font-size: 11px; font-weight: 700; box-shadow: 0 3px 8px rgba(21,156,135,.15); }
 .button:hover { background: var(--teal-dark); }
 .button:disabled { opacity: .48; cursor: not-allowed; }
+.button.danger-button { color: #a3443e; border-color: #f0d7d4; background: #fff3f1; box-shadow: none; }
+.button.danger-button:hover { background: #ffe9e6; }
 .button.secondary { color: #526272; background: #fff; border-color: var(--line); box-shadow: none; }
 .button.secondary:hover { background: #f9fbfc; }
 .button.ghost { color: var(--teal-dark); background: var(--teal-soft); box-shadow: none; }
@@ -102,6 +104,11 @@ h1 { margin: 0; font-size: 27px; line-height: 1.28; letter-spacing: -1px; font-w
 .badge.waiting_approval, .badge.in_review, .badge.draft { color: #9b6818; background: #fff5e5; }
 .badge.failed, .badge.blocked, .badge.rejected { color: #a3443e; background: #fff0ef; }
 .approval-banner { display: flex; align-items: center; justify-content: space-between; gap: 15px; grid-column: span 12; padding: 15px 18px; border: 1px solid #f4e2c4; border-radius: 11px; background: #fffaf1; }
+.approval-panel, .review-panel { grid-column: span 12; padding: 20px; }
+.approval-list { display: grid; }
+.approval-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 1px; border-top: 1px solid #f0f2f4; }
+.approval-row:first-child { border-top: 0; }
+.small-button { min-height: 32px; padding: 0 10px; font-size: 10px; }
 .approval-left { display: flex; gap: 11px; align-items: center; }
 .approval-icon { width: 32px; height: 32px; display: grid; place-items: center; background: var(--gold-soft); color: #ac741b; border-radius: 9px; }
 .approval-title { font-size: 11px; font-weight: 700; color: #72511f; }
@@ -141,6 +148,19 @@ h1 { margin: 0; font-size: 27px; line-height: 1.28; letter-spacing: -1px; font-w
 .recent-name { font-size: 11px; font-weight: 700; }
 .recent-path { margin-top: 3px; color: #91a0aa; font-size: 9px; }
 .error-card { padding: 18px; color: #9b403a; background: #fff1ef; border: 1px solid #f1d8d5; border-radius: 10px; font-size: 11px; line-height: 1.7; }
+.review-link { display: inline-block; margin-top: 6px; padding-left: 0; }
+.review-summary { display: flex; align-items: center; gap: 12px; padding: 11px 0; color: #65737e; font-size: 10px; }
+.changed-files { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 12px 0; border-top: 1px solid #f0f2f4; color: #53616c; font-size: 10px; }
+.changed-files strong { margin-right: 4px; }
+.changed-files code, .artifact-hash code { padding: 4px 6px; border-radius: 5px; color: #3c5961; background: #f0f5f6; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.diff-view, .diff-check { max-height: 470px; overflow: auto; margin: 13px 0 0; padding: 15px; border: 1px solid #e8edf1; border-radius: 8px; color: #dce7e9; background: #1e2c35; font: 10px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-check { max-height: 120px; color: #ffe0bc; background: #473622; }
+.artifact-view { color: #3b4a54; background: #f7f9fa; }
+.artifact-hash { color: #71808a; font-size: 9px; line-height: 2; overflow-wrap: anywhere; }
+.decision-reason { display: grid; gap: 7px; margin-top: 17px; color: #43525e; font-size: 10px; font-weight: 700; }
+.decision-reason textarea { width: 100%; border: 1px solid #dfe6ea; border-radius: 8px; padding: 10px; color: #263541; font: inherit; font-size: 11px; resize: vertical; }
+.review-confirm { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #43525e; font-size: 10px; }
+.review-confirm input { accent-color: var(--teal); }
 .handoff-list { display: grid; gap: 7px; }
 .handoff-row { padding: 13px 1px; border-top: 1px solid #f0f2f4; }
 .handoff-row:first-child { border-top: 0; }
@@ -152,6 +172,7 @@ h1 { margin: 0; font-size: 27px; line-height: 1.28; letter-spacing: -1px; font-w
 .handoff-risk { margin-top: 8px; color: #986a28; font-size: 9px; line-height: 1.6; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 24px; background: rgba(18, 32, 43, .48); }
 .modal-card { width: min(620px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; padding: 25px; border: 1px solid #e8edf1; border-radius: 15px; background: #fff; box-shadow: 0 24px 70px rgba(13, 30, 42, .24); }
+.modal-card.wide-modal { width: min(720px, 100%); }
 .modal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .modal-top h2 { margin: 0; color: #1c2933; font-size: 21px; letter-spacing: -.6px; }
 .modal-description { margin: 9px 0 19px; font-size: 11px; line-height: 1.7; }
@@ -160,6 +181,11 @@ h1 { margin: 0; font-size: 27px; line-height: 1.28; letter-spacing: -1px; font-w
 .idea-form input, .idea-form textarea { width: 100%; border: 1px solid #dfe6ea; border-radius: 8px; outline: none; padding: 10px 11px; color: #263541; background: #fff; font: inherit; font-size: 11px; font-weight: 400; resize: vertical; }
 .idea-form input:focus, .idea-form textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(21,156,135,.1); }
 .idea-form input::placeholder, .idea-form textarea::placeholder { color: #a0abb3; }
+.field-help { color: #84919b; font-size: 9px; font-weight: 400; }
+.risk-choices { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.risk-choices legend { padding: 0 5px; color: #43525e; font-size: 10px; font-weight: 700; }
+.risk-choices label { display: flex; align-items: center; gap: 5px; color: #5a6974; font-size: 10px; font-weight: 500; }
+.risk-choices input { accent-color: var(--teal); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 5px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
