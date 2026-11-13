@@ -33,6 +33,8 @@ Runtime 실행 이벤트는 `.agent-team/events/<run-id>.jsonl`에 저장됩니�
 
 `team init`은 기존 파일을 덮어쓰지 않고 `company/`, `knowledge/`, `work/`의 시작 템플릿을 생성합니다. `company/profile.yaml`의 `undecided` 항목을 실제 사업과 제품 정보로 채운 뒤 `team bootstrap status`로 필요한 지식 모듈과 overlay를 확인합니다.
 
+전문 지식은 source manifest와 원문 hash, 적용 조건이 있는 Knowledge Card로 관리합니다. `team knowledge check`와 `team knowledge compile`을 통과한 fresh·verified Card만 지정된 Agent context에 들어가며, active module의 지식 공백은 qualification 실패로 표시됩니다.
+
 Task와 Handoff는 `.agent-team/state.db`에 저장됩니다. Task 상태는 정의된 상태 머신을 통해서만 변경되며, Handoff는 Agent 결과 schema를 통과한 불변 기록입니다.
 
 Workflow는 `workflows/*.yaml`에 정의합니다. loader는 dependency와 cycle을 검증하며, 실행기는 이전 단계의 전체 대화 대신 검증된 Handoff만 다음 Agent에 전달합니다.
@@ -52,4 +54,5 @@ Engineering 변경은 `.agent-team/worktrees/<task-id>`의 전용 branch에서 �
 - [시작 안내](./docs/getting-started.md)
 - [운영 안내](./docs/operations.md)
 - [복구 안내](./docs/recovery.md)
+- [Knowledge 운영](./docs/knowledge.md)
 - [구현 현황과 남은 단계](./docs/implementation-status.md)

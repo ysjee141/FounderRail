@@ -8,6 +8,7 @@ import { loadAgentContext } from "./context/loader.js";
 import { scaffoldProject } from "./context/scaffold.js";
 import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
+import { auditKnowledge, compileKnowledge } from "./knowledge/cards.js";
 import { collectWorktreeEvidence, createEngineeringWorktree } from "./engineering/worktree.js";
 import { calculateRunway } from "./finance/runway.js";
 import { deriveRiskFlags } from "./risk/router.js";
@@ -45,6 +46,8 @@ function usage(): void {
   team agents
   team ask <agent-id> <request> [--dry-run]
   team bootstrap status
+  team knowledge check
+  team knowledge compile
   team task create --owner <agent-id> --objective <text> --why <text> [--write <path/**>]... [--forbid <action>]...
   team task show <task-id>
   team task transition <task-id> <status>
@@ -164,6 +167,34 @@ async function ask(root: string, args: string[]): Promise<void> {
 async function bootstrapStatus(root: string, args: string[]): Promise<void> {
   if (args[0] !== "status") throw new Error("Usage: team bootstrap status");
   console.log(JSON.stringify(await readBootstrapStatus(root), null, 2));
+}
+
+function knowledgeReport(audit: Awaited<ReturnType<typeof auditKnowledge>>) {
+  return {
+    qualified: audit.qualified,
+    checked_at: audit.checkedAt,
+    active_modules: audit.activeModules,
+    valid_sources: audit.validSources.map((source) => source.id),
+    valid_cards: audit.validCards.map((card) => card.id),
+    coverage_gaps: audit.coverageGaps,
+    issues: audit.issues,
+  };
+}
+
+async function knowledge(root: string, args: string[]): Promise<void> {
+  if (args[0] === "check") {
+    const audit = await auditKnowledge(root);
+    console.log(JSON.stringify(knowledgeReport(audit), null, 2));
+    if (!audit.qualified) process.exitCode = 1;
+    return;
+  }
+  if (args[0] === "compile") {
+    const result = await compileKnowledge(root);
+    console.log(JSON.stringify({ ...knowledgeReport(result.audit), written: result.written }, null, 2));
+    if (!result.audit.qualified) process.exitCode = 1;
+    return;
+  }
+  throw new Error("Usage: team knowledge <check|compile>");
 }
 
 async function withTaskStore<T>(root: string, operation: (store: TaskStore) => T | Promise<T>): Promise<T> {
@@ -352,6 +383,7 @@ async function main(): Promise<void> {
   else if (command === "agents") await listAgents(root);
   else if (command === "ask") await ask(root, args);
   else if (command === "bootstrap") await bootstrapStatus(root, args);
+  else if (command === "knowledge") await knowledge(root, args);
   else if (command === "task") await task(root, args);
   else if (command === "handoff") await handoff(root, args);
   else if (command === "workflow") await workflow(root, args);

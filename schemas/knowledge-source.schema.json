@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Knowledge Source Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sources"],
+  "properties": {
+    "version": { "const": 1 },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "authority", "url", "kind", "module", "jurisdiction", "content_path", "sha256", "retrieved_at", "verified_at", "review_after", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "title": { "type": "string", "minLength": 1 },
+          "authority": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "format": "uri" },
+          "kind": { "enum": ["official", "standard", "vendor", "research", "secondary"] },
+          "module": { "type": "string", "pattern": "^[a-z0-9-/]+$" },
+          "jurisdiction": { "type": "string", "minLength": 1 },
+          "content_path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "retrieved_at": { "type": "string", "format": "date" },
+          "verified_at": { "type": ["string", "null"], "format": "date" },
+          "review_after": { "type": "string", "format": "date" },
+          "status": { "enum": ["candidate", "verified", "rejected"] }
+        }
+      }
+    }
+  }
+}
