@@ -10,6 +10,7 @@ import { JsonlEventStore } from "./events/jsonl-store.js";
 import { readBootstrapStatus } from "./knowledge/bootstrap.js";
 import { TaskStore } from "./store/task-store.js";
 import { agentResultSchema, taskStatusSchema } from "./tasks/contracts.js";
+import { loadWorkflow } from "./workflows/loader.js";
 import { getRuntimeAdapter, getRuntimeAdapters } from "./runtime/registry.js";
 import type { RuntimeMode } from "./runtime/types.js";
 
@@ -32,6 +33,7 @@ function usage(): void {
   team task transition <task-id> <status>
   team handoff record --task <task-id> --agent <agent-id> --from <json-file>
   team handoff list <task-id>
+  team workflow inspect <workflow-id>
   team run --prompt <text> [--mode read-only|workspace-write] [--timeout-ms 300000]`);
 }
 
@@ -200,6 +202,11 @@ async function handoff(root: string, args: string[]): Promise<void> {
   throw new Error("Usage: team handoff <record|list> ...");
 }
 
+async function workflow(root: string, args: string[]): Promise<void> {
+  if (args[0] !== "inspect" || !args[1]) throw new Error("Usage: team workflow inspect <workflow-id>");
+  console.log(JSON.stringify(await loadWorkflow(root, args[1]), null, 2));
+}
+
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const root = process.cwd();
@@ -215,6 +222,7 @@ async function main(): Promise<void> {
   else if (command === "bootstrap") await bootstrapStatus(root, args);
   else if (command === "task") await task(root, args);
   else if (command === "handoff") await handoff(root, args);
+  else if (command === "workflow") await workflow(root, args);
   else if (command === "run") await run(root, args);
   else throw new Error(`Unknown command: ${command}`);
 }

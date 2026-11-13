@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-team.local/schemas/workflow.schema.json",
+  "title": "Agent Team Workflow",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "steps"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "agent", "prompt", "requires", "when", "retry"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "agent": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
+          "prompt": { "type": "string", "minLength": 1 },
+          "requires": { "type": "array", "items": { "type": "string" } },
+          "when": { "enum": ["always", "risk_flags_present"] },
+          "retry": { "type": "integer", "minimum": 0, "maximum": 3 }
+        }
+      }
+    }
+  }
+}
