@@ -352,18 +352,31 @@ export async function resumeDesktopWorkflow(
   projectRoot: string,
   harnessRoot: string,
   runId: string,
-): Promise<void> {
+  additionalInput: string,
+) {
+  const parsedAdditionalInput = z.string().trim().min(1).max(3000).parse(additionalInput);
   const store = await openStore(projectRoot);
   let retained = false;
   try {
     const run = store.getWorkflowRun(runId);
+    if (run.status !== "blocked" && run.status !== "failed") {
+      throw new Error(`Workflow ${runId} cannot resume from ${run.status}.`);
+    }
     const workflow = await loadWorkflow(harnessRoot, run.workflow_id);
     const runner = await createRuntimeWorkflowRunner(projectRoot, 300_000, undefined, harnessRoot);
-    const operation = resumeWorkflow(workflow, store, runId, runner, approvalRunner(projectRoot, store));
+    const operation = resumeWorkflow(
+      workflow,
+      store,
+      runId,
+      runner,
+      approvalRunner(projectRoot, store),
+      parsedAdditionalInput,
+    );
     retainStoreUntilComplete(store, operation);
     retained = true;
   } catch (error) {
     if (!retained) store.close();
     throw error;
   }
+  return inspectDesktopProject(projectRoot, harnessRoot);
 }

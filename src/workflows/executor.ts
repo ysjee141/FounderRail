@@ -130,7 +130,8 @@ export async function resumeWorkflow(
   runId: string,
   runner: AgentStepRunner,
   approvalRunner?: ApprovalStepRunner,
+  additionalInput?: string,
 ): Promise<WorkflowExecutionResult> {
-  const run = taskStore.resumeWorkflowRun(runId, workflow);
+  const run = taskStore.resumeWorkflowRun(runId, workflow, additionalInput);
   return driveWorkflow(workflow, taskStore, run, runner, approvalRunner);
 }

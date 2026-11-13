@@ -11,9 +11,11 @@ const statusNames = {
   draft: "초안",
   ready: "준비됨",
   running: "실행 중",
-  blocked: "확인 필요",
+  blocked: "추가 정보 필요",
   in_review: "검토 중",
   waiting_approval: "승인 대기",
+  needs_input: "입력 요청",
+  ready_for_review: "검토 준비",
   completed: "완료",
   failed: "실패",
   cancelled: "취소됨",
@@ -143,10 +145,33 @@ function taskRows(tasks) {
     <div class="task-row"><div class="row-primary"><div class="row-title">${escapeHtml(task.objective)}</div><div class="row-meta">${escapeHtml(task.id)} · ${escapeHtml(task.owner_agent)} · ${dateLabel(task.updated_at)}</div></div>${badge(task.status)}</div>`).join("")}</div>`;
 }
 
-function runRows(runs) {
+function runRows(runs, handoffs, agents) {
   if (!runs.length) return `<div class="empty-state"><div class="empty-mark">↗</div><div class="empty-title">실행 기록이 없습니다.</div><div class="empty-copy">workflow 실행 결과가 이곳에 표시됩니다.</div></div>`;
-  return `<div class="run-list">${runs.slice(0, 5).map((run) => `
-    <div class="run-row"><div class="row-primary"><div class="row-title">${escapeHtml(run.workflow_id)}</div><div class="row-meta">${escapeHtml(run.id)} · ${escapeHtml(run.task_id)} · ${dateLabel(run.updated_at)}</div><div class="row-meta">단계 ${run.steps.filter((step) => ["completed", "skipped"].includes(step.status)).length}/${run.steps.length} 완료${run.status === "running" ? ` · ${escapeHtml(run.steps.find((step) => step.status === "running")?.step_id || "준비 중")}` : ""}</div>${run.steps.find((step) => step.error)?.error ? `<div class="run-error">${escapeHtml(run.steps.find((step) => step.error).error)}</div>` : ""}${run.workflow_id === "feature-delivery" && run.steps.some((step) => step.step_id === "engineering-implement" && step.status === "completed") ? `<button class="text-link review-link" data-review-task="${escapeHtml(run.task_id)}">변경 검토</button>` : ""}</div>${badge(run.status)}</div>`).join("")}</div>`;
+  return `<div class="run-list">${runs.slice(0, 5).map((run) => {
+    const completed = run.steps.filter((step) => ["completed", "skipped"].includes(step.status)).length;
+    const blockedStep = run.steps.find((step) => step.status === "blocked");
+    const blockedHandoff = blockedStep?.handoff_id
+      ? handoffs.find((handoff) => handoff.id === blockedStep.handoff_id)
+      : null;
+    const blockedAgent = agents.find((agent) => agent.id === blockedStep?.agent_id);
+    const runningStep = run.steps.find((step) => step.status === "running");
+    return `
+    <div class="run-row"><div class="row-primary"><div class="row-title">${escapeHtml(run.workflow_id)}</div><div class="row-meta">${escapeHtml(run.id)} · ${escapeHtml(run.task_id)} · ${dateLabel(run.updated_at)}</div><div class="row-meta">단계 ${completed}/${run.steps.length} 완료${runningStep ? ` · 진행 중: ${escapeHtml(runningStep.step_id)}` : blockedStep ? ` · 중단: ${escapeHtml(blockedStep.step_id)}` : ""}</div>${run.steps.find((step) => step.error)?.error ? `<div class="run-error">${escapeHtml(run.steps.find((step) => step.error).error)}</div>` : ""}${run.status === "blocked" ? `<div class="run-blocked-help"><strong>${escapeHtml(blockedAgent?.name ?? blockedStep?.agent_id ?? blockedStep?.step_id ?? "Agent")} 단계에서 추가 정보가 필요합니다.</strong><p>${escapeHtml(blockedHandoff?.summary ?? "Agent가 추가 정보를 요청했습니다. 아래 입력란에 필요한 내용을 적고 재개하세요.")}</p>${blockedHandoff?.decisions?.length ? `<div class="run-next-label">Agent의 확인 요청</div><ul>${blockedHandoff.decisions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}${blockedHandoff?.risks?.length ? `<div class="run-next-label">남은 위험</div><ul>${blockedHandoff.risks.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}<label class="run-resume-field">보완 정보<textarea data-resume-input rows="2" maxlength="3000" placeholder="Agent가 요청한 정보나 결정을 적어주세요."></textarea></label><button class="button small-button" data-resume-workflow="${escapeHtml(run.id)}">정보를 보완하고 재개</button><div class="field-help">완료된 단계는 건너뛰고 중단된 단계부터 이어서 실행합니다.</div></div>` : ""}${run.workflow_id === "feature-delivery" && run.steps.some((step) => step.step_id === "engineering-implement" && step.status === "completed") ? `<button class="text-link review-link" data-review-task="${escapeHtml(run.task_id)}">변경 검토</button>` : ""}</div>${badge(run.status)}</div>`;
+  }).join("")}</div>`;
+}
+
+async function resumeWorkflowFromDashboard(runId) {
+  const button = [...document.querySelectorAll("[data-resume-workflow]")]
+    .find((item) => item.dataset.resumeWorkflow === runId);
+  const additionalInput = button?.closest(".run-row")?.querySelector("[data-resume-input]")?.value ?? "";
+  if (!additionalInput.trim()) {
+    toast("Agent가 요청한 보완 정보를 입력하세요.", true);
+    return;
+  }
+  const resumed = await withBusy("보완 정보를 저장하고 Workflow를 재개합니다", () => (
+    window.founderDesk.resumeWorkflow(runId, additionalInput)
+  ));
+  if (resumed) toast("보완 정보를 전달했습니다. Workflow가 중단된 단계부터 다시 실행됩니다.");
 }
 
 function approvalRows(approvals) {
@@ -179,7 +204,7 @@ function renderDashboard(snapshot) {
           <section class="card stat-card"><div class="stat-top"><span class="stat-label">승인 대기</span><span class="stat-icon">✓</span></div><div class="stat-value">${approvals}</div><div class="stat-foot">${snapshot.runtime ? escapeHtml(runtimeNames[snapshot.runtime]) : "Runtime 미설정"}</div></section>
           <section class="card stat-card"><div class="stat-top"><span class="stat-label">Git 상태</span><span class="stat-icon">⌘</span></div><div class="stat-value compact">${snapshot.git.isRepository ? (snapshot.git.clean ? "Clean" : "변경 있음") : "미연결"}</div><div class="stat-foot">${gitMessage}</div></section>
           <section class="card panel"><div class="panel-header"><div><div class="panel-title">최근 작업</div><div class="panel-description">Task 상태와 담당 Agent</div></div><button class="text-link" id="refresh-tasks">새로고침</button></div>${taskRows(snapshot.tasks)}</section>
-          <section class="card panel side-panel"><div class="panel-header"><div><div class="panel-title">Workflow 기록</div><div class="panel-description">Agent 단계와 승인 진행 상황</div></div><button class="text-link" id="refresh-runs">새로고침</button></div>${runRows(snapshot.runs)}</section>
+          <section class="card panel side-panel"><div class="panel-header"><div><div class="panel-title">Workflow 기록</div><div class="panel-description">진행 단계, 필요한 입력과 다음 행동</div></div><button class="text-link" id="refresh-runs">새로고침</button></div>${runRows(snapshot.runs, snapshot.handoffs, snapshot.agents)}</section>
           <section class="card panel"><div class="panel-header"><div><div class="panel-title">최근 Agent 결과</div><div class="panel-description">Agent가 다음 작업자에게 전달한 요약</div></div></div>${handoffRows(snapshot.handoffs)}</section>
           ${renderTaskReview()}
           ${renderApprovalArtifact()}
@@ -204,6 +229,7 @@ function renderDashboard(snapshot) {
   document.querySelectorAll('[data-nav="risk"]').forEach((button) => button.addEventListener("click", () => openOperationalDialog("incident")));
   document.querySelectorAll('[data-nav="knowledge"]').forEach((button) => button.addEventListener("click", openKnowledgePanel));
   document.querySelectorAll("[data-operational-workflow]").forEach((button) => button.addEventListener("click", () => openOperationalDialog(button.dataset.operationalWorkflow)));
+  document.querySelectorAll("[data-resume-workflow]").forEach((button) => button.addEventListener("click", () => resumeWorkflowFromDashboard(button.dataset.resumeWorkflow)));
   document.querySelector("#refresh-knowledge")?.addEventListener("click", openKnowledgePanel);
   document.querySelectorAll("[data-review-task]").forEach((button) => button.addEventListener("click", () => openTaskReview(button.dataset.reviewTask)));
   document.querySelectorAll("[data-approval-artifact]").forEach((button) => button.addEventListener("click", () => openApprovalArtifact(button.dataset.approvalArtifact)));

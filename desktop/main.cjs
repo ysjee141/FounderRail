@@ -159,6 +159,14 @@ function registerIpc() {
     return (await service()).startDesktopOperationalWorkflow(activeProjectRoot, harnessRoot, input);
   });
 
+  ipcMain.handle("workflows:resume", async (event, runId, additionalInput) => {
+    assertTrustedSender(event);
+    if (!activeProjectRoot) throw new Error("Open a project folder first.");
+    if (typeof runId !== "string" || !/^RUN-[A-Z0-9-]+$/.test(runId)) throw new Error("Invalid Workflow run id.");
+    if (typeof additionalInput !== "string") throw new Error("Enter the additional information requested by the Agent.");
+    return (await service()).resumeDesktopWorkflow(activeProjectRoot, harnessRoot, runId, additionalInput);
+  });
+
   ipcMain.handle("knowledge:inspect", async (event) => {
     assertTrustedSender(event);
     if (!activeProjectRoot) throw new Error("Open a project folder first.");

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("founderDesk", {
   startIdeaValidation: (input) => ipcRenderer.invoke("workflows:startIdeaValidation", input),
   startFeatureDelivery: (input) => ipcRenderer.invoke("workflows:startFeatureDelivery", input),
   startOperationalWorkflow: (input) => ipcRenderer.invoke("workflows:startOperational", input),
+  resumeWorkflow: (runId, additionalInput) => ipcRenderer.invoke("workflows:resume", runId, additionalInput),
   inspectKnowledge: () => ipcRenderer.invoke("knowledge:inspect"),
   getTaskReview: (taskId) => ipcRenderer.invoke("reviews:getTask", taskId),
   getApprovalArtifact: (approvalId) => ipcRenderer.invoke("approvals:getArtifact", approvalId),
