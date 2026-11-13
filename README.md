@@ -9,7 +9,7 @@ npm install
 npm run desktop
 ```
 
-데스크탑 앱은 프로젝트마다 Claude Code, Codex, Gemini CLI 중 하나를 선택합니다. 앱에 포함된 Agent와 workflow 정의를 사용하고, Task·Handoff·실행 상태는 선택한 프로젝트의 `.agent-team/state.db`에 저장합니다. 현재 데스크탑 흐름에서는 아이디어 검증을 실행하고 결과를 읽을 수 있습니다. 제품 구현, 변경사항 검토와 배포 승인은 CLI로 진행합니다. 자세한 내용은 [데스크탑 앱 안내](./docs/desktop-app.md)를 참고하세요.
+데스크탑 앱은 프로젝트마다 Claude Code, Codex, Gemini CLI 중 하나를 선택합니다. 앱에 포함된 Agent와 workflow 정의를 사용하고, Task·Handoff·실행 상태는 선택한 프로젝트의 `.agent-team/state.db`에 저장합니다. 아이디어 검증과 제품 기능 workflow를 실행하고, Task worktree의 변경사항을 검토할 수 있습니다. 앱은 승인과 거절 기록을 저장하지만 merge나 배포는 실행하지 않습니다. 자세한 내용은 [데스크탑 앱 안내](./docs/desktop-app.md)를 참고하세요.
 
 ```bash
 npm install

@@ -142,6 +142,11 @@ export async function collectWorktreeEvidence(
 
   const statusText = await git(worktreeReal, ["status", "--porcelain=v1"]);
   const changedText = await git(worktreeReal, ["diff", "--name-only", worktree.baseCommit, "--"]);
+  const untrackedResult = await execFileAsync("git", ["-C", worktreeReal, "ls-files", "--others", "--exclude-standard", "-z"], {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const untrackedFiles = untrackedResult.stdout.split("\0").filter(Boolean);
   const diffStat = await git(worktreeReal, ["diff", "--stat", worktree.baseCommit, "--"]);
   let diffCheckPassed = true;
   let diffCheckOutput = "";
@@ -155,6 +160,48 @@ export async function collectWorktreeEvidence(
 
   const status = statusText ? statusText.split("\n") : [];
   const changedFiles = new Set(changedText ? changedText.split("\n") : []);
+  for (const file of untrackedFiles) {
+    const absolute = path.resolve(worktreeReal, file);
+    const relative = path.relative(worktreeReal, absolute);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      diffCheckPassed = false;
+      diffCheckOutput += `Untracked path escapes worktree: ${file}\n`;
+      continue;
+    }
+    if (await realpath(absolute) !== absolute) {
+      diffCheckPassed = false;
+      diffCheckOutput += `Untracked path resolves through a symlink: ${file}\n`;
+      continue;
+    }
+    const fileInfo = await lstat(absolute);
+    if (fileInfo.isSymbolicLink() || !fileInfo.isFile()) {
+      diffCheckPassed = false;
+      diffCheckOutput += `Untracked file is not a regular file: ${file}\n`;
+      continue;
+    }
+    changedFiles.add(file);
+    try {
+      await execFileAsync("git", ["-C", worktreeReal, "diff", "--no-index", "--no-color", "--", "/dev/null", file], {
+        encoding: "utf8",
+        maxBuffer: 2 * 1024 * 1024,
+      });
+    } catch (error) {
+      const failure = error as { code?: string | number; stdout?: string; stderr?: string; message?: string };
+      if (failure.code === 1) {
+        const patch = failure.stdout ?? "";
+        const whitespace = patch.split("\n").filter((line) =>
+          line.startsWith("+") && !line.startsWith("+++") && /[\t ]+$/.test(line.slice(1))
+        );
+        if (whitespace.length > 0) {
+          diffCheckPassed = false;
+          diffCheckOutput += `Trailing whitespace in untracked file ${file}:\n${whitespace.join("\n")}\n`;
+        }
+      } else {
+        diffCheckPassed = false;
+        diffCheckOutput += `Could not check untracked file ${file}: ${failure.message}\n`;
+      }
+    }
+  }
   for (const entry of status) {
     const statusPath = entry.slice(3);
     const finalPath = statusPath.includes(" -> ") ? statusPath.split(" -> ").at(-1) : statusPath;
