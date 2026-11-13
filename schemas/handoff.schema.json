@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-team.local/schemas/handoff.schema.json",
+  "title": "Agent Handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "task_id", "agent_id", "created_at", "status", "summary", "artifacts", "evidence", "decisions", "assumptions", "risks", "requested_next_agent"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^HANDOFF-[A-Z0-9-]+$" },
+    "task_id": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+    "agent_id": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "status": { "$ref": "agent-result.schema.json#/properties/status" },
+    "summary": { "$ref": "agent-result.schema.json#/properties/summary" },
+    "artifacts": { "$ref": "agent-result.schema.json#/properties/artifacts" },
+    "evidence": { "$ref": "agent-result.schema.json#/properties/evidence" },
+    "decisions": { "$ref": "agent-result.schema.json#/properties/decisions" },
+    "assumptions": { "$ref": "agent-result.schema.json#/properties/assumptions" },
+    "risks": { "$ref": "agent-result.schema.json#/properties/risks" },
+    "requested_next_agent": { "$ref": "agent-result.schema.json#/properties/requested_next_agent" }
+  }
+}
