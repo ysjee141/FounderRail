@@ -1,0 +1,25 @@
+version: 1
+schedules:
+  - id: weekly-operations
+    workflow_id: weekly-operations
+    cadence: weekly
+    weekday: 1
+    timezone: Asia/Seoul
+    at: "09:00"
+    catch_up_hours: 48
+    owner_agent: founder-office
+    objective: 이번 주 고객·제품·현금·위험 변화를 검토한다.
+    why: 1인 창업자가 운영 신호와 다음 결정을 놓치지 않기 위해서다.
+    enabled: true
+
+  - id: monthly-close
+    workflow_id: monthly-close
+    cadence: monthly
+    day: 1
+    timezone: Asia/Seoul
+    at: "09:00"
+    catch_up_hours: 168
+    owner_agent: founder-office
+    objective: 지난달 사업·제품·재무·기술·위험 상태를 마감한다.
+    why: 다음 달 목표와 예산을 실제 evidence에 근거해 결정하기 위해서다.
+    enabled: true

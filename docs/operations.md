@@ -19,6 +19,27 @@ team workflow resume <run-id>
 
 재개 시 `completed`와 `skipped` step은 다시 실행하지 않는다. 시작 당시 workflow SHA-256과 현재 YAML 정의가 다르면 재개를 거부하므로, 정의를 되돌리거나 새 Task/run을 만든다.
 
+## 정기 운영 Task
+
+`schedules/operations.yaml`은 Asia/Seoul 기준 월요일 09:00 weekly review와 매월 1일 09:00 monthly close를 정의한다. Scheduler는 workflow를 자동 실행하지 않고 검토 가능한 `draft` Task만 만든다.
+
+```bash
+team schedule list
+team schedule tick
+team task transition <created-task-id> ready
+team workflow run weekly-operations --task <created-task-id>
+```
+
+동일 schedule·local-time slot은 SQLite primary key로 한 번만 생성된다. `catch_up_hours` 안에서 Harness가 늦게 실행돼도 가장 최근 slot을 보충하며, 그보다 오래된 누락을 임의로 생성하지 않는다. 시간대는 IANA 이름으로 선언하고 DST 변환 후 local time round-trip을 검사한다.
+
+Harness 자체는 항상 실행되는 daemon이 아니다. 운영체제 scheduler가 저장소 루트에서 `team schedule tick`을 주기적으로 호출하도록 설정한다. 예를 들어 cron에서는 15분마다 실행하되, 실제 Task 생성 여부는 Harness의 timezone·slot·idempotency gate가 결정하게 한다.
+
+```cron
+*/15 * * * * cd /absolute/path/to/project && /absolute/path/to/team schedule tick >> .agent-team/scheduler.log 2>&1
+```
+
+환경별 절대 경로와 로그 보존 정책을 확인하고 등록한다. 인증이 필요한 Coding Agent는 tick에서 실행되지 않는다.
+
 ## Task와 Handoff
 
 ```bash

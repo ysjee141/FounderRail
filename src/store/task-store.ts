@@ -74,6 +74,15 @@ export class TaskStore {
         updated_at TEXT NOT NULL
       ) STRICT;
       CREATE INDEX IF NOT EXISTS idx_workflow_runs_task_created ON workflow_runs(task_id, created_at, id);
+      CREATE TABLE IF NOT EXISTS schedule_firings (
+        schedule_id TEXT NOT NULL,
+        slot TEXT NOT NULL,
+        scheduled_at TEXT NOT NULL,
+        task_id TEXT NOT NULL REFERENCES tasks(id),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (schedule_id, slot)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_schedule_firings_created ON schedule_firings(created_at, schedule_id, slot);
     `);
     return new TaskStore(db);
   }
@@ -130,6 +139,54 @@ export class TaskStore {
     const row = this.db.prepare("SELECT document FROM handoffs WHERE id = ?").get(id) as { document: string } | undefined;
     if (!row) throw new Error(`Handoff not found: ${id}`);
     return handoffContractSchema.parse(JSON.parse(row.document));
+  }
+
+  createScheduledDraft(
+    scheduleId: string,
+    slot: string,
+    scheduledAt: string,
+    input: CreateTask,
+  ): { created: boolean; task: TaskContract } {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db.prepare(`
+        SELECT task_id FROM schedule_firings WHERE schedule_id = ? AND slot = ?
+      `).get(scheduleId, slot) as { task_id: string } | undefined;
+      if (existing) {
+        const task = this.getTask(existing.task_id);
+        this.db.exec("COMMIT");
+        return { created: false, task };
+      }
+      const task = this.createTask(input);
+      this.db.prepare(`
+        INSERT INTO schedule_firings (schedule_id, slot, scheduled_at, task_id, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(scheduleId, slot, scheduledAt, task.id, new Date().toISOString());
+      this.db.exec("COMMIT");
+      return { created: true, task };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  listScheduleFirings(): Array<{
+    schedule_id: string;
+    slot: string;
+    scheduled_at: string;
+    task_id: string;
+    created_at: string;
+  }> {
+    return this.db.prepare(`
+      SELECT schedule_id, slot, scheduled_at, task_id, created_at
+      FROM schedule_firings ORDER BY scheduled_at DESC, schedule_id, slot
+    `).all() as Array<{
+      schedule_id: string;
+      slot: string;
+      scheduled_at: string;
+      task_id: string;
+      created_at: string;
+    }>;
   }
 
   startWorkflowRun(workflow: WorkflowDefinition, taskId: string): WorkflowRun {
