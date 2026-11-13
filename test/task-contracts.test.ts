@@ -22,3 +22,24 @@ test("creates a complete task contract with stable timestamps", () => {
 test("rejects an incomplete agent result", () => {
   assert.throws(() => agentResultSchema.parse({ status: "completed", summary: "No evidence fields" }));
 });
+
+test("rejects unsafe or unsupported writable path scopes", () => {
+  const base = {
+    owner_agent: "engineering" as const,
+    objective: "Scoped change",
+    why: "Prevent worktree escape",
+    inputs: [],
+    acceptance: [],
+    checks: [],
+    risk_flags: [],
+    approval: { required_for: [] },
+  };
+  assert.throws(() => createTaskContract({
+    ...base,
+    scope: { writable_paths: ["../outside/**"], forbidden_actions: [] },
+  }));
+  assert.throws(() => createTaskContract({
+    ...base,
+    scope: { writable_paths: ["src/*.ts"], forbidden_actions: [] },
+  }));
+});

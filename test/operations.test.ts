@@ -8,7 +8,10 @@ test("loads the core operating workflows", async () => {
   const ids = ["feature-delivery", "weekly-operations", "monthly-close", "incident"];
   const workflows = await Promise.all(ids.map((id) => loadWorkflow(process.cwd(), id)));
   assert.deepEqual(workflows.map((workflow) => workflow.id), ids);
-  assert.equal(workflows.find((workflow) => workflow.id === "feature-delivery")?.steps[2]?.when, "risk_flags_present");
+  assert.equal(
+    workflows.find((workflow) => workflow.id === "feature-delivery")?.steps.find((step) => step.id === "risk-review")?.when,
+    "risk_flags_present",
+  );
 });
 
 test("routes only risk-relevant changes to explicit flags", () => {

@@ -45,3 +45,15 @@ team inbox
 ```
 
 현재 `team ask`는 읽기 전용이다. 정상 실행 결과는 Runtime별 stream을 그대로 노출하지 않고 공통 Agent Result JSON으로 반환한다. schema에 맞지 않는 응답은 실패한다. Agent가 생성한 문서 변경은 scoped writer와 workflow를 통해 연결해야 한다.
+
+코드 변경 Task는 허용할 경로를 좁게 선언한다. `--write`와 `--forbid`는 반복할 수 있다.
+
+```bash
+team task create \
+  --owner engineering \
+  --objective "인증 callback 검증" \
+  --why "세션 위조를 차단한다" \
+  --write "src/auth/**" \
+  --write "test/auth/**" \
+  --forbid production.deploy
+```

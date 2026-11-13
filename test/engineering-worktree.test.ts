@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { collectWorktreeEvidence, createEngineeringWorktree } from "../src/engineering/worktree.js";
+import {
+  collectWorktreeEvidence,
+  createEngineeringWorktree,
+  ensureEngineeringWorktree,
+  loadEngineeringWorktree,
+} from "../src/engineering/worktree.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,6 +40,16 @@ test("creates an isolated engineering branch without changing the main checkout"
   assert.equal(await git(worktree.path, ["branch", "--show-current"]), worktree.branch);
   assert.equal(await git(root, ["rev-parse", "HEAD"]), mainHead);
   assert.equal(await git(root, ["status", "--porcelain"]), "");
+  assert.deepEqual(await loadEngineeringWorktree(root, "TASK-ABC-123"), worktree);
+  assert.deepEqual(await ensureEngineeringWorktree(root, "TASK-ABC-123"), worktree);
+});
+
+test("includes untracked files in deterministic worktree evidence", async (t) => {
+  const root = await repository(t);
+  const worktree = await createEngineeringWorktree(root, "TASK-UNTRACKED");
+  await writeFile(path.join(worktree.path, "untracked.txt"), "new\n");
+  const evidence = await collectWorktreeEvidence(root, worktree);
+  assert.deepEqual(evidence.changedFiles, ["untracked.txt"]);
 });
 
 test("collects changed files and diff-check evidence from the managed worktree", async (t) => {
@@ -55,4 +70,12 @@ test("collects changed files and diff-check evidence from the managed worktree",
 test("rejects invalid task ids before invoking git worktree", async (t) => {
   const root = await repository(t);
   await assert.rejects(() => createEngineeringWorktree(root, "../../escape"), /Invalid task id/);
+});
+
+test("refuses a redirected managed worktree directory", async (t) => {
+  const root = await repository(t);
+  const outside = await mkdtemp(path.join(os.tmpdir(), "agent-team-worktree-outside-"));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  await symlink(outside, path.join(root, ".agent-team"));
+  await assert.rejects(() => createEngineeringWorktree(root, "TASK-SYMLINK"), /redirected/);
 });

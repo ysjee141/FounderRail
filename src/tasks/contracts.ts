@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AGENT_IDS } from "../agents/types.js";
+import { normalizeScopedPath } from "../agents/path-policy.js";
+
+const writablePathSchema = z.string().min(1).refine(
+  (value) => !value.includes("\\") && normalizeScopedPath(value) === value
+    && (!value.includes("*") || value.endsWith("/**") && !value.slice(0, -3).includes("*")),
+  "Writable path must be a normalized project file or directory/** scope",
+);
 
 export const TASK_STATUSES = [
   "draft",
@@ -25,7 +32,7 @@ export const taskContractSchema = z.object({
   why: z.string().min(1),
   inputs: z.array(z.string()),
   scope: z.object({
-    writable_paths: z.array(z.string()),
+    writable_paths: z.array(writablePathSchema),
     forbidden_actions: z.array(z.string()),
   }),
   acceptance: z.array(z.string()),

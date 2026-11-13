@@ -17,16 +17,27 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "type", "agent", "prompt", "requires", "when", "retry"],
+            "required": ["id", "type", "agent", "prompt", "execution", "requires", "when", "retry"],
             "properties": {
               "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
               "type": { "const": "agent" },
               "agent": { "enum": ["founder-office", "product-growth", "engineering", "finance-ops", "risk-quality"] },
               "prompt": { "type": "string", "minLength": 1 },
+              "execution": { "enum": ["standard", "engineering-plan", "engineering-implement", "engineering-review"] },
               "requires": { "type": "array", "items": { "type": "string" } },
               "when": { "enum": ["always", "risk_flags_present"] },
               "retry": { "type": "integer", "minimum": 0, "maximum": 3 }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "execution": { "enum": ["engineering-plan", "engineering-implement", "engineering-review"] }
+                  }
+                },
+                "then": { "properties": { "agent": { "const": "engineering" } } }
+              }
+            ]
           },
           {
             "type": "object",

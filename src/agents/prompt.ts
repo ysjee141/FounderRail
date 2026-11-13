@@ -1,7 +1,19 @@
 import type { AgentDefinition } from "./types.js";
 import type { ContextDocument } from "../context/loader.js";
 
-export function compileAgentPrompt(agent: AgentDefinition, request: string, context: ContextDocument[] = []): string {
+export interface PromptBoundary {
+  writablePaths?: string[];
+  forbiddenActions?: string[];
+}
+
+export function compileAgentPrompt(
+  agent: AgentDefinition,
+  request: string,
+  context: ContextDocument[] = [],
+  boundary: PromptBoundary = {},
+): string {
+  const writablePaths = boundary.writablePaths ?? agent.context.write;
+  const forbiddenActions = [...new Set([...agent.tools.deny, ...(boundary.forbiddenActions ?? [])])];
   const sections = [
     `# Role: ${agent.name} (${agent.id})`,
     "",
@@ -9,8 +21,8 @@ export function compileAgentPrompt(agent: AgentDefinition, request: string, cont
     "",
     "## Enforced operating boundary",
     `Readable paths:\n${agent.context.read.map((item) => `- ${item}`).join("\n")}`,
-    `Writable paths:\n${agent.context.write.map((item) => `- ${item}`).join("\n")}`,
-    `Denied actions:\n${agent.tools.deny.map((item) => `- ${item}`).join("\n")}`,
+    `Writable paths:\n${writablePaths.map((item) => `- ${item}`).join("\n") || "- none"}`,
+    `Denied actions:\n${forbiddenActions.map((item) => `- ${item}`).join("\n")}`,
     `Actions requiring human approval:\n${agent.approval.required_for.map((item) => `- ${item}`).join("\n")}`,
     "Do not read or modify paths outside these scopes. Do not perform denied or approval-gated actions.",
     "",
